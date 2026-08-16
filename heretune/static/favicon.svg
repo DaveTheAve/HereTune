@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="HereTune favicon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111426"/>
+      <stop offset="0.55" stop-color="#181c35"/>
+      <stop offset="1" stop-color="#0b0e1a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="35%" cy="18%" r="70%">
+      <stop offset="0" stop-color="#6ee7ff" stop-opacity="0.35"/>
+      <stop offset="0.5" stop-color="#7c5cff" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#7c5cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="barsLeft" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3bcaff"/>
+      <stop offset="1" stop-color="#6ee7ff"/>
+    </linearGradient>
+    <linearGradient id="barsRight" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#b79cff"/>
+      <stop offset="1" stop-color="#f08dff"/>
+    </linearGradient>
+  </defs>
+  <rect x="14" y="14" width="228" height="228" rx="40" fill="url(#bg)" stroke="#7c5cff" stroke-opacity="0.75" stroke-width="5"/>
+  <rect x="14" y="14" width="228" height="228" rx="40" fill="url(#glow)"/>
+  <g transform="translate(128 111)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-83-3c16-64 150-64 166 0 9 35-8 77-37 81-21 3-29-28-46-28s-25 31-46 28c-29-4-46-46-37-81Z" stroke="#b7a7ff" stroke-width="9"/>
+    <circle cx="-38" cy="-3" r="13" stroke="#6ee7ff" stroke-width="7"/>
+    <circle cx="38" cy="-3" r="13" stroke="#6ee7ff" stroke-width="7"/>
+    <path d="M-6-7 24 11-6 29Z" fill="#f6f7ff" stroke="#f6f7ff" stroke-width="6"/>
+  </g>
+  <g transform="translate(39 170)">
+    <rect x="0" y="26" width="10" height="12" rx="3" fill="url(#barsLeft)"/>
+    <rect x="15" y="18" width="10" height="20" rx="3" fill="url(#barsLeft)"/>
+    <rect x="30" y="8" width="10" height="30" rx="3" fill="url(#barsLeft)"/>
+    <rect x="45" y="-4" width="10" height="42" rx="3" fill="url(#barsLeft)"/>
+    <rect x="60" y="-20" width="10" height="58" rx="3" fill="url(#barsLeft)"/>
+    <rect x="75" y="-38" width="10" height="76" rx="3" fill="url(#barsLeft)"/>
+    <rect x="90" y="-20" width="10" height="58" rx="3" fill="url(#barsRight)"/>
+    <rect x="105" y="-4" width="10" height="42" rx="3" fill="url(#barsRight)"/>
+    <rect x="120" y="8" width="10" height="30" rx="3" fill="url(#barsRight)"/>
+    <rect x="135" y="18" width="10" height="20" rx="3" fill="url(#barsRight)"/>
+    <rect x="150" y="26" width="10" height="12" rx="3" fill="url(#barsRight)"/>
+  </g>
+</svg>

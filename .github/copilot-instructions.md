@@ -1,0 +1,1 @@
+Read and follow the repository-root `AGENTS.md` before proposing changes. In particular: never invent HSP semantics, never reintroduce persistent analysis JPEG caches, preserve zero-as-unlimited config semantics, keep source media untouched, and add regression tests for fixes.

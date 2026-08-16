@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>HereTune Web Player</title>
+  <link rel="stylesheet" href="/static/player.css?v=0.13.0">
+</head>
+<body>
+  <div class="player-ambient a"></div><div class="player-ambient b"></div>
+  <header class="player-header">
+    <a href="/ui" class="back-link">← Library</a>
+    <div class="player-title"><strong id="playerTitle">Loading…</strong><small id="playerMeta">Original source · no transcode</small></div>
+    <div class="player-header-actions">
+      <a id="nativePlayerLink" class="native-handoff" href="#" title="When opened inside HereSphere's built-in browser, supported direct video links can hand off to the native player.">🥽 Native handoff</a>
+      <div class="source-pill"><span></span> <b id="sourcePillLabel">FULL QUALITY</b></div>
+    </div>
+  </header>
+
+  <main class="player-main">
+    <section class="stage" id="stage">
+      <canvas id="glCanvas"></canvas>
+      <video id="sourceVideo" playsinline preload="metadata"></video>
+      <video id="fallbackVideo" playsinline preload="metadata" controls hidden></video>
+      <div class="stage-loading" id="stageLoading"><i></i><strong>Opening original source…</strong><span>Nothing is being transcoded. Your NAS remains emotionally intact.</span></div>
+      <div class="stage-error" id="stageError" hidden><strong>Browser playback unavailable</strong><span id="stageErrorText"></span><div><a id="directMediaLink" class="player-button" target="_blank">Open original stream</a><a href="/ui" class="player-button ghost">Back to library</a></div></div>
+      <div class="compare-label before" id="beforeLabel" hidden>ORIGINAL</div>
+      <div class="compare-label after" id="afterLabel" hidden>CORRECTED</div>
+      <div class="split-line" id="splitLine" hidden></div>
+      <div class="look-hint" id="lookHint" hidden>Drag to look around · wheel to zoom · reverse direction is optional</div>
+      <div class="grade-indicator" id="gradeIndicator" hidden>Grade 1/1</div>
+      <aside class="player-diagnostics" id="playerDiagnostics" hidden><div class="diagnostics-heading"><strong>Playback diagnostics</strong><button id="closeDiagnosticsButton" type="button">×</button></div><div id="diagnosticsBody"></div></aside>
+    </section>
+
+    <section class="player-panel">
+      <div class="mode-row">
+        <div class="control-group" id="viewGroup"><span id="viewGroupLabel">VIEW</span><div class="segmented" id="viewModes"><button id="viewVr2dButton" data-view="vr2d" class="active">2D VR View</button><button id="viewEyeButton" data-view="eye">Single eye</button><button id="viewRawButton" data-view="raw">Raw source</button></div></div>
+        <div class="control-group"><span>COLOR</span><div class="segmented" id="colorModes"><button data-color="corrected" class="active">Corrected</button><button data-color="split">Compare</button><button data-color="original">Original</button></div></div>
+        <div class="control-group eye-group" id="eyeGroup"><span>EYE</span><div class="segmented" id="eyeModes"><button data-eye="left" class="active">Left</button><button data-eye="right">Right</button></div></div>
+        <div class="control-group" id="orientationGroup"><span>ORIENTATION</span><div class="segmented" id="orientationModes"><button data-orientation="normal" class="active">Normal</button><button data-orientation="rotate180">180°</button><button data-orientation="mirror">Mirror</button><button data-orientation="flipv">Flip V</button></div></div>
+        <div class="control-group drag-direction-control" id="dragDirectionGroup"><span>CAMERA DRAG</span><label class="player-toggle" title="Reverse the horizontal and vertical 2D VR camera-drag direction"><input id="reverseDragToggle" type="checkbox"><i></i><b>Reverse drag</b></label></div>
+        <div class="control-group split-control" id="splitControl" hidden><span>BEFORE / AFTER</span><input id="splitRange" type="range" min="0" max="100" value="50"></div>
+      </div>
+
+      <div class="timeline-row"><span id="currentTime">0:00</span><input id="timeline" type="range" min="0" max="1000" value="0"><span id="duration">0:00</span></div>
+      <div class="transport-row">
+        <div class="transport-left"><button class="round-button" id="playButton" aria-label="Play">▶</button><button class="small-button" id="rewindButton">−10s</button><button class="small-button" id="forwardButton">+10s</button></div>
+        <div class="transport-center"><span id="qualityText">Waiting for video metadata…</span></div>
+        <div class="transport-right"><span class="volume-icon">🔊</span><input id="volume" type="range" min="0" max="1" step="0.01" value="1"><button class="small-button" id="resetCameraButton" title="Reset VR camera (R)">Reset view</button><button class="small-button" id="diagnosticsButton" title="Playback diagnostics (D)">Diagnostics</button><button class="small-button" id="fullscreenButton">Fullscreen</button></div>
+      </div>
+      <div class="shortcut-hint"><span><kbd>Space</kbd> play/pause</span><span><kbd>←/→</kbd> seek</span><span><kbd>R</kbd> reset view</span><span><kbd>D</kbd> diagnostics</span><span><kbd>O/C/B</kbd> original/corrected/compare</span></div>
+      <div class="player-notice" id="playerNotice"><strong>Browser correction preview:</strong> live GPU/WebGL approximation of HereTune's calculated image settings. <strong>Normal 2D videos use the full frame.</strong> VR videos add a 2D projection or single-eye step before the exact same correction / comparison renderer. If a source has unusual camera/container orientation, the <strong>Orientation</strong> control can rotate or mirror the monitor preview without changing the source or HereSphere HSP. HereSphere’s native HSP renderer remains authoritative.</div>
+    </section>
+  </main>
+
+  <script src="/static/player.js?v=0.13.0" defer></script>
+</body>
+</html>

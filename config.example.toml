@@ -1,0 +1,216 @@
+[library]
+# Add as many local folders or UNC/network shares as you want. They are merged
+# into one HereTune library while each source remains in place.
+roots = []
+# Example:
+# roots = ["D:\\VR", "E:\\Movies", "\\\\MEDIA-PC\\VR", "\\\\NAS\\Media\\VR"]
+extensions = [".mp4", ".mkv", ".mov", ".m4v", ".webm", ".avi", ".ts", ".m2ts", ".mts", ".mpg", ".mpeg", ".wmv"]
+scan_interval_seconds = 60
+
+[server]
+host = "0.0.0.0"
+port = 8777
+# Usually blank. HereTune uses the Host header HereSphere connects to.
+public_base_url = ""
+# Optional HereSphere Web API authentication. Leave blank for trusted-LAN use.
+username = ""
+password = ""
+auth_token = ""
+# Optional dashboard/admin HTTP Basic authentication. If you expose your LAN to
+# people you do not trust, that sentence is already the problem; still, use this.
+dashboard_username = ""
+dashboard_password = ""
+allow_file_delete = false
+media_chunk_bytes = 1048576
+max_hsp_writeback_bytes = 16777216
+# Direct pointer movement is the default. Set true to make the browser VR-to-2D
+# camera move opposite the mouse; the player also offers a remembered local toggle.
+web_player_invert_drag = false
+# Start with queue/scanning paused until the dashboard user explicitly clicks
+# Resume work. Helpful for slower machines, sleepy NAS boxes, or people who
+# would like their CPU fan to file fewer emotional complaints at boot.
+start_paused = true
+# Show the HSP isolation lab in the right drawer. The feature is permanent;
+# hide it when you do not need per-control headset A/B testing.
+show_hsp_diagnostic_tools = false
+# Work around HereSphere library-group navigation that cannot scroll long names.
+# Favorites is shown as ♥, the aggregate library as All, then real folders use
+# A, B, C... aliases. Labels are regenerated per response; no mapping is stored.
+compact_heresphere_library_labels = false
+# Show only videos with completed analysis and a generated Auto HSP in the
+# HereSphere Web API library. Pending/error videos stay visible in HereTune.
+heresphere_ready_only = true
+
+[analysis]
+# cpu    = CPU decode/scale + CPU analysis
+# gpu    = CUDA/NVDEC decode+resize, then the exact same CPU NumPy/OpenCV analysis
+# hybrid = pipeline CUDA sampling and CPU analysis at the same time
+# auto   = prefer Hybrid when CUDA is healthy; otherwise fall back to CPU
+execution_mode = "auto"
+auto_preference = "hybrid"
+gpu_device = 0
+gpu_decode_workers = 4
+cpu_analysis_workers = 8
+probe_workers = 8
+gpu_fallback_to_cpu = true
+# Dynamically treats worker settings as ceilings and backs off under load.
+adaptive_workers = true
+# Run heavy analysis outside the dashboard/server process so a native crash is isolated.
+isolate_analysis_worker = true
+# Persist compact statistics/checkpoints so interrupted jobs can resume. No analysis JPEGs are stored.
+analysis_cache_enabled = true
+# Statistics/checkpoints only. Inspector images are decoded live from source media.
+analysis_cache_max_gb = 20.0
+
+# Defaults tuned for long >=5760x2880 VR videos.
+# IMPORTANT: these are the expensive full-resolution correction samples.
+# `sample_interval_seconds` does NOT control scene-boundary detection when
+# scene_grading is enabled; use `scene_probe_interval_seconds` below for that.
+samples = 48
+analysis_width = 960
+adaptive_sampling = true
+sample_interval_seconds = 30.0
+# 0 = unlimited; any positive value is an exact hard ceiling.
+max_samples = 360
+smart_sampling = true
+candidate_multiplier = 1.35
+
+# Native image-grade controls. HereSphere's observed neutral Sharpen value is 2.0.
+strength = 1.0
+skin_priority = 1.25
+white_balance = true
+tone = true
+saturation = true
+advanced_tone = true
+sharpening = true
+temperature_tint = true
+temperature_tint_strength = 0.45
+max_sharpen = 3.0
+min_rgb_gain = 0.80
+max_rgb_gain = 1.24
+
+# Brightness-dependent residual color casts. These are very small native RGB
+# Saturation/Contrast/Gamma/Offset trims after the primary RGB gain correction.
+per_channel_color = true
+per_channel_strength = 0.55
+max_channel_gamma_delta = 0.045
+max_channel_offset = 0.016
+max_channel_contrast_delta = 0.035
+max_channel_saturation_delta = 0.030
+
+# Sparse, stable HSP Image keyframes for sustained lighting/camera changes.
+# HereTune uses minimum duration, before/after windows, persistence and hysteresis;
+# it does not perform continuous frame-by-frame automatic white balance.
+# scene_max_keyframes = 0 means unlimited; any positive value is honored exactly.
+scene_grading = true
+scene_max_keyframes = 0
+scene_min_seconds = 30.0
+scene_change_threshold = 1.15
+scene_min_confidence = 0.62
+# Dense, low-cost scene pass. 10 seconds is the normal 20-60 minute cadence;
+# shorter/longer videos adapt automatically around that value. Candidate
+# boundaries are then refined at 2-second spacing before the expensive pass.
+scene_probe_interval_seconds = 10.0
+scene_probe_width = 480
+scene_boundary_refine_seconds = 2.0
+scene_probe_persistence = 2
+scene_full_samples_per_segment = 9
+scene_probe_max_samples = 900
+
+# Decoder watchdogs. Individual remote/NAS seeks are killed and retried rather
+# than being allowed to leave an idle ffmpeg.exe holding the analysis forever.
+ffmpeg_sample_timeout_seconds = 20.0
+ffmpeg_aux_timeout_seconds = 45.0
+ffprobe_timeout_seconds = 30.0
+
+# Multi-frame VR verification and conservative HSP geometry correction.
+vr_verification = true
+vr_verification_frames = 6
+orientation_verification = true
+orientation_auto_apply = false
+eye_swap_auto_apply = false
+stereo_alignment = true
+stereo_alignment_auto_apply = true
+stereo_alignment_min_confidence = 0.72
+stereo_alignment_max_degrees = 0.75
+stereo_roll_correction = true
+stereo_roll_auto_apply = false
+stereo_scale_correction = true
+stereo_scale_auto_apply = false
+stitch_correction = true
+stitch_auto_apply = false
+max_stitch_shift = 0.025
+max_stitch_scale_delta = 0.030
+
+# Persistent encoded-border crop and camera horizon evidence. Crop is enabled
+# only for safe projections/high confidence; horizon application is opt-in.
+auto_crop = true
+auto_crop_min_confidence = 0.82
+auto_crop_max_zoom = 1.32
+horizon_leveling = true
+horizon_auto_apply = false
+horizon_min_confidence = 0.78
+horizon_max_degrees = 3.0
+
+autofocus_tuning = true
+autofocus_auto_apply = false
+lens_verification = true
+lens_fov_auto_apply = false
+lens_fov_min_confidence = 0.80
+
+# Native HSP Audio/Sync controls. Bounded loudness normalization may apply;
+# timing and drift remain diagnostic unless explicitly enabled.
+audio_correction = true
+loudness_normalization = true
+audio_sync_analysis = true
+audio_sync_auto_apply = false
+target_audio_mean_db = -20.0
+max_audio_gain = 1.35
+
+[hsp]
+generated_version = 7
+# If headset HSP write-back is enabled below, false keeps HereTune Auto active
+# until Manual is explicitly selected in the dashboard.
+prefer_manual_writeback = false
+# Safety default: do not ask HereSphere to POST imported/edited HSP bytes while
+# a video may be playing. Favorites and half-star ratings remain writable.
+# Enable only if you specifically need headset/manual HSP persistence.
+accept_hsp_writebacks = false
+revisioned_urls = true
+
+# Auto-HSP output policy. Analysis still measures and stores these values even
+# when a control is disabled here, so changing policy rebuilds HSPs without
+# decoding the source video again. Global Offset remains outside the analyzer's
+# tone solve; its OFF-by-default switch only permits a separate bounded suggestion.
+auto_sharpen = true
+auto_exposure = true
+auto_temperature = true
+auto_tint = true
+auto_rgb_gain = true
+auto_global_offset = false
+auto_rgb_offset = true
+auto_global_gamma = true
+auto_rgb_gamma = true
+auto_global_contrast = true
+auto_rgb_contrast = true
+auto_global_saturation = true
+auto_rgb_saturation = true
+# Headset testing also found positive Shadows unsafe for many sources. It is
+# analyzed and retained, but OFF globally unless a video explicitly Force Ons it.
+auto_shadows = false
+auto_midtones = true
+auto_highlights = true
+auto_scene_keyframes = true
+
+# Keep HereTune's current Auto HSP atomically beside each source as <stem>.hsp.
+# This is useful for direct SMB/local playback and backup. Do not enable HereSphere's
+# automatic HSP writer against the same files at the same time. Unknown/user-owned
+# sidecars are never overwritten automatically. Turning this ON retroactively syncs
+# existing Ready videos in a background job shown in the dashboard work strip. Turning
+# it OFF stops future sync but does not delete files that were already written.
+write_auto_sidecars = false
+
+[paths]
+data_dir = "./data"
+ffmpeg = "ffmpeg"
+ffprobe = "ffprobe"

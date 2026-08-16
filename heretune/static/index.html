@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>HereTune</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/favicon-180.png">
+  <link rel="stylesheet" href="/static/styles.css?v=0.13.0">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="HereTune dashboard">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 64 64"><path d="M8 30C14 8 50 8 56 30c4 15-4 28-15 29-6 1-8-12-9-12s-3 13-9 12C12 58 4 45 8 30Z"/><circle cx="21" cy="30" r="7"/><circle cx="43" cy="30" r="7"/></svg>
+      </span>
+      <span><strong>HereTune</strong><small>Adaptive HSP Calibration</small></span>
+    </a>
+    <div class="connection">
+      <span class="pulse" id="healthPulse"></span>
+      <span class="connection-copy"><strong id="connectionText">Connecting…</strong><small id="accelerationText">Checking acceleration…</small></span>
+    </div>
+    <nav class="header-actions">
+      <button class="button ghost" id="queueButton">Priority queue</button>
+      <button class="button ghost" id="settingsButton">Settings</button>
+      <button class="button ghost" id="doctorButton">Run doctor</button>
+      <button class="button ghost" id="pauseWorkButton" title="Pause automatic indexing and analysis">Pause work</button>
+      <button class="button primary" id="scanButton">Scan library</button>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <span class="eyebrow">YOUR HERE<span>SPHERE</span> COMPANION</span>
+        <h1><span>Intelligent correction.</span><em>Original media.</em></h1>
+        <p>HereTune analyzes your videos scene by scene, builds native HereSphere corrections, and serves the original files untouched. Better color. Better balance. Better VR. No re-encode. No duplicate media. No NAS filing for emotional damages.</p>
+      </div>
+      <div class="endpoint-card">
+        <span>Open this address in HereSphere</span>
+        <div class="endpoint-row">
+          <code id="heresphereUrl">http://this-computer:8777/heresphere</code>
+          <button type="button" class="icon-button endpoint-copy-button" id="copyUrl" title="Copy HereSphere URL">Copy</button>
+        </div>
+        <small>Use your computer’s LAN IP when connecting from a Quest.</small>
+        <small class="setup-note"><strong>HereSphere main Settings:</strong> enable <em>Always Load HSP</em> for Web API media. This is a player-local setting and cannot be switched by HereTune.</small>
+      </div>
+    </section>
+
+    <section class="stats" aria-label="Library statistics">
+      <article class="stat-card"><span>Total library</span><strong id="statTotal">—</strong><small>original videos</small></article>
+      <article class="stat-card ready" title="Videos with completed analysis and a HereTune correction ready for HereSphere."><span>Analyzed</span><strong id="statReady">—</strong><small>corrections ready</small></article>
+      <article class="stat-card pending queue-card" title="Queue ETA uses recent completed analyses when timing history is available; otherwise HereTune shows a baseline estimate."><span>Queue</span><strong id="statPending">—</strong><small id="statQueueDetail">waiting · baseline ETA</small></article>
+      <article class="stat-card confidence" title="Average confidence in white-balance evidence across analyzed videos, combining neutral-pixel evidence, face/skin evidence, and usable-sample coverage."><span>Avg. WB confidence</span><strong id="statConfidence">—</strong><small>neutral + face/skin evidence</small></article>
+    </section>
+
+    <section class="work-strip" id="workStrip" hidden>
+      <div class="spinner"></div>
+      <div class="work-copy"><strong id="workTitle">Analyzing</strong><span id="workDetail">Sampling representative frames…</span><div class="pipeline-stages" id="pipelineStages" aria-label="Analysis stages"></div></div>
+      <div class="work-progress" id="workProgressBar"><i></i></div>
+    </section>
+
+    <section class="library-panel">
+      <div class="section-heading">
+        <div><span class="eyebrow">LIBRARY</span><h2>Correction queue</h2></div>
+        <div class="toolbar library-toolbar">
+          <label class="search library-search"><span>⌕</span><input id="searchInput" type="search" placeholder="Search titles or folders"></label>
+          <div class="filter-cluster" aria-label="Library filters">
+            <span class="filter-cluster-label">Filters</span>
+            <label class="compact-filter"><span>Status</span><select id="statusFilter" aria-label="Filter by status">
+              <option value="">All</option>
+              <option value="ready">Ready</option>
+              <option value="pending">Queued / changed</option>
+              <option value="analyzing">Analyzing</option>
+              <option value="skipped">Skipped</option>
+              <option value="error">Error</option>
+            </select></label>
+            <label class="compact-filter"><span>Favorite</span><select id="favoriteFilter" aria-label="Filter by favorite">
+              <option value="all">All</option>
+              <option value="favorite">Favorites</option>
+              <option value="not_favorite">Not favorites</option>
+            </select></label>
+            <label class="compact-filter"><span>Rating</span><select id="ratingFilter" aria-label="Filter by rating">
+              <option value="all">All</option>
+              <option value="5">5 stars</option>
+              <option value="4.5plus">4½+ stars</option>
+              <option value="4plus">4+ stars</option>
+              <option value="3.5plus">3½+ stars</option>
+              <option value="3plus">3+ stars</option>
+              <option value="2.5plus">2½+ stars</option>
+              <option value="2plus">2+ stars</option>
+              <option value="1.5plus">1½+ stars</option>
+              <option value="1plus">1+ stars</option>
+              <option value="0.5plus">½+ star</option>
+              <option value="rated">Rated</option>
+              <option value="unrated">Unrated</option>
+            </select></label>
+            <label class="compact-filter"><span>Watch</span><select id="watchFilter" aria-label="Filter by watch history">
+              <option value="all">All</option>
+              <option value="continue">Continue</option>
+              <option value="completed">Completed</option>
+              <option value="never">Never watched</option>
+            </select></label>
+            <label class="compact-filter"><span>Copies</span><select id="duplicateFilter" aria-label="Filter duplicates">
+              <option value="all">All</option>
+              <option value="duplicates">Duplicates</option>
+            </select></label>
+          </div>
+          <div class="table-actions">
+
+            <button class="button small ghost table-action-button" id="selectAllButton" title="Select every video matching the current search and filters">Select all</button>
+            <button class="button small ghost filter-reset" id="resetFiltersButton" title="Clear search and restore default filters">Reset</button>
+            <button class="button small ghost table-action-button" id="analyzeAllButton">Requeue errors</button>
+            <div class="pagination-top" aria-label="Library pagination shortcut">
+              <button class="page-mini-button" id="pagePrevTopButton" aria-label="Previous page" title="Previous page">‹</button>
+              <strong id="pageStatusTop">1 / 1</strong>
+              <button class="page-mini-button" id="pageNextTopButton" aria-label="Next page" title="Next page">›</button>
+            </div>
+            <label class="compact-filter sort-filter"><span>Sort</span><select id="orderSelect" aria-label="Sort videos">
+              <option value="title">Title</option>
+              <option value="recent">Recently added</option>
+              <option value="priority">Queue priority</option>
+              <option value="rating">Highest rated</option>
+              <option value="favorite">Favorites first</option>
+              <option value="watched">Recently watched</option>
+              <option value="plays">Most played</option>
+              <option value="confidence">Confidence</option>
+              <option value="status">Status</option>
+            </select></label>
+          </div>
+        </div>
+      </div>
+      <div class="selection-bar" id="selectionBar" hidden>
+        <div><strong id="selectionCount">0 selected</strong><span id="selectionScope">Current selection</span></div>
+        <div class="selection-actions">
+          <button class="button small primary" id="prioritizeSelectionButton">↑ Prioritize selection</button>
+          <button class="button small ghost" id="clearSelectionButton">Clear selection</button>
+        </div>
+      </div>
+      <div class="table-wrap" id="videoTableWrap">
+        <table id="videoTable">
+          <colgroup>
+            <col class="col-select"><col class="col-video"><col class="col-status"><col class="col-profile"><col class="col-library"><col class="col-corrections"><col class="col-confidence"><col class="col-action">
+          </colgroup>
+          <thead><tr><th class="select-column"><input id="selectVisibleCheckbox" type="checkbox" aria-label="Select all loaded rows"></th><th>Video</th><th>Status</th><th>Profile</th><th>Library</th><th>Corrections</th><th>Confidence</th><th></th></tr></thead>
+          <tbody id="videoRows"></tbody>
+        </table>
+        <div class="empty-state" id="emptyState" hidden>
+          <strong>No videos yet</strong>
+          <span>Run a library scan. If this remains empty, the NAS may be playing hard to get.</span>
+        </div>
+      </div>
+      <div class="table-scroll-proxy" id="tableScrollProxy" hidden aria-label="Horizontal table scrollbar"><div></div></div>
+      <div class="pagination" aria-label="Library pagination">
+        <span class="pagination-results" id="resultCount">0 videos</span>
+        <div class="pagination-controls">
+          <label class="page-size-label"><span>Rows</span><select id="pageSizeSelect" aria-label="Videos per page"><option value="25">25</option><option value="50" selected>50</option><option value="100">100</option><option value="200">200</option></select></label>
+          <button class="button small ghost page-button" id="pageFirstButton" aria-label="First page" title="First page">«</button>
+          <button class="button small ghost page-button" id="pagePrevButton" aria-label="Previous page" title="Previous page">‹</button>
+          <strong id="pageStatus">Page 1 of 1</strong>
+          <button class="button small ghost page-button" id="pageNextButton" aria-label="Next page" title="Next page">›</button>
+          <button class="button small ghost page-button" id="pageLastButton" aria-label="Last page" title="Last page">»</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <div class="site-footer-brand">
+        <span class="site-footer-kicker">HERETUNE</span>
+        <strong>Adaptive HSP Calibration</strong>
+        <small>Original media. Better behaved.</small>
+      </div>
+      <p>Independent companion for HereSphere · No transcoding · No duplicate media · No NAS existential crisis.</p>
+      <nav class="site-footer-actions" aria-label="HereTune footer">
+        <span class="site-footer-version" id="footerVersion">v—</span>
+        <a href="/docs" target="_blank" rel="noopener">API docs</a>
+        <button type="button" id="footerDoctorButton">Doctor</button>
+        <button type="button" id="footerSettingsButton">Settings</button>
+      </nav>
+    </div>
+  </footer>
+
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close-drawer></div>
+    <section class="drawer-panel">
+      <button class="drawer-close" data-close-drawer aria-label="Close">×</button>
+      <div id="drawerContent"></div>
+    </section>
+  </aside>
+
+  <dialog id="setupDialog" class="setup-dialog">
+    <div class="setup-shell">
+      <span class="eyebrow">FIRST RUN</span>
+      <h2>Welcome to HereTune</h2>
+      <p class="dialog-copy">Three minutes now saves forty-seven minutes later wondering why the server is enthusiastically indexing absolutely nothing.</p>
+      <div class="setup-progress" aria-label="Setup progress"><i class="active"></i><i></i><i></i><i></i></div>
+      <section class="setup-step active" data-setup-step="0">
+        <h3>1. Point HereTune at your media</h3>
+        <p>Add one or more local folders or UNC/network shares visible from this Windows PC. They become one HereTune library while the original files remain exactly where they are.</p>
+        <div class="library-roots-editor setup-roots-editor" id="setupLibraryRoots"></div>
+        <div class="library-root-actions"><button type="button" class="button ghost small" id="setupAddLibraryRoot">+ Add another folder</button><button type="button" class="button ghost small" id="setupTestLibrary">Test all folders</button><small id="setupLibraryResult">No folders tested yet.</small></div>
+      </section>
+      <section class="setup-step" data-setup-step="1">
+        <h3>2. Pick a starting profile</h3>
+        <p>Presets only fill performance/sampling settings. They do not hide the knobs; you can tune every value later in Settings.</p>
+        <div class="preset-cards" id="setupPresetCards"></div>
+      </section>
+      <section class="setup-step" data-setup-step="2">
+        <h3>3. Check the plumbing</h3>
+        <div class="setup-checks">
+          <div><span id="setupFfmpegMark">○</span><strong>FFmpeg</strong><small id="setupFfmpegText">Checking…</small></div>
+          <div><span id="setupFfprobeMark">○</span><strong>FFprobe</strong><small id="setupFfprobeText">Checking…</small></div>
+          <div><span id="setupAccelMark">○</span><strong>Acceleration</strong><small id="setupAccelText">Checking CUDA/NVDEC…</small></div>
+          <div><span>ⓘ</span><strong>HereSphere</strong><small>After setup, add the displayed Web API URL in HereSphere and enable <em>Always Load HSP</em>.</small></div>
+        </div>
+      </section>
+      <section class="setup-step" data-setup-step="3">
+        <h3>4. Ready to unleash the tiny unpaid colorist</h3>
+        <p>HereTune will save <code>config.toml</code>, start scanning immediately, and then offer a short guided tour of the dashboard.</p>
+        <div class="setup-summary" id="setupSummary"></div>
+      </section>
+      <div class="setup-actions">
+        <button type="button" class="button ghost" id="setupBackButton" disabled>Back</button>
+        <button type="button" class="button primary" id="setupNextButton">Next</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="tourDialog" class="tour-dialog">
+    <div class="tour-card">
+      <span class="eyebrow">GUIDED TOUR</span>
+      <h2 id="tourTitle">Meet the dashboard</h2>
+      <p id="tourCopy"></p>
+      <div class="tour-count" id="tourCount"></div>
+      <div class="tour-actions"><button type="button" class="button ghost" id="tourSkipButton">Skip</button><button type="button" class="button primary" id="tourNextButton">Next</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="doctorDialog" class="health-dialog doctor-dialog">
+    <form method="dialog"><button class="drawer-close" value="close">×</button></form>
+    <div class="dialog-heading-row"><div><span class="eyebrow">DIAGNOSTICS</span><h2>HereTune doctor</h2><p class="dialog-copy">Runtime checks, library health, storage, database integrity, and safe maintenance in one place.</p></div></div>
+    <div class="doctor-tabs" role="tablist" aria-label="Doctor sections">
+      <button type="button" class="active" data-doctor-tab="checks" role="tab" aria-selected="true">Diagnostics</button>
+      <button type="button" data-doctor-tab="health" role="tab" aria-selected="false">Library health</button>
+    </div>
+    <section class="doctor-tab-panel" data-doctor-panel="checks"><div id="doctorResults" class="doctor-results"></div></section>
+    <section class="doctor-tab-panel" data-doctor-panel="health" hidden>
+      <div class="doctor-health-heading"><div><strong>Storage, database & maintenance</strong><small>Health snapshot plus safe maintenance tools. Maintenance waits until active analysis is idle.</small></div><button class="button ghost small" id="refreshHealthButton" type="button">Refresh</button></div>
+      <div id="healthResults" class="health-results"><div class="empty-inline">Open Library health to load the snapshot.</div></div>
+    </section>
+  </dialog>
+
+  <dialog id="queueDialog" class="queue-dialog">
+    <form method="dialog"><button class="drawer-close" value="close">×</button></form>
+    <span class="eyebrow">PRIORITY QUEUE</span>
+    <h2>Analyze these next</h2>
+    <p class="dialog-copy">New priority requests append to the end of this list (FIFO). Drag promoted videos only when you deliberately want to reorder them. They run before the normal queue.</p>
+    <div id="priorityQueueList" class="priority-queue-list"></div>
+    <div class="queue-empty" id="priorityQueueEmpty" hidden>No promoted videos. The normal queue is in charge.</div>
+  </dialog>
+
+  
+
+  <dialog id="settingsDialog" class="settings-dialog">
+    <form method="dialog"><button class="drawer-close" value="close">×</button></form>
+    <div class="settings-heading">
+      <span class="eyebrow">CONFIGURATION</span>
+      <h2>HereTune settings</h2>
+      <p>Edit the real <code>config.toml</code> without spelunking through punctuation. Settings are grouped by what they affect, validated before save, and written atomically.</p>
+      <div class="settings-index"><a href="#settingsLibrary">Library</a><a href="#settingsAnalysis">Analysis</a><a href="#settingsImage">Image grade</a><a href="#settingsHsp">HereSphere</a><a href="#settingsRuntime">Runtime</a></div>
+    </div>
+    <form id="settingsForm" class="settings-form">
+      <section class="settings-section preset-section">
+        <div class="settings-section-title"><span>★</span><div><h3>Quick analysis presets</h3><p>Start with a sensible profile, then customize anything below. Applying a preset changes the form only; nothing is written until you click Save settings.</p></div></div>
+        <div class="preset-cards" id="settingsPresetCards"></div>
+        <div class="settings-preset-actions"><button type="button" class="button ghost small" id="takeTourButton">Take guided tour</button></div>
+      </section>
+      <section class="settings-section library-settings-section" id="settingsLibrary">
+        <div class="settings-section-title"><span>01</span><div><h3>Media library</h3><p>Combine local disks, multiple content folders, NAS shares, and folders exposed by other computers into one library.</p></div></div>
+        <div class="library-manager-card">
+          <div class="library-manager-heading"><div><strong>Media folders</strong><small>Each folder is scanned independently. If one network share is offline, HereTune keeps the other roots available instead of marking the offline share's videos missing.</small></div><span id="libraryRootCount" class="calibration-badge">0 FOLDERS</span></div>
+          <div class="library-roots-editor" id="settingsLibraryRoots"></div>
+          <div class="library-root-actions"><button type="button" class="button ghost small" id="addLibraryRootButton">+ Add media folder</button><button type="button" class="button ghost small" id="testLibraryRootsButton">Test folders</button><small id="libraryRootsStatus">Local paths and UNC shares are supported.</small></div>
+        </div>
+        <div class="settings-grid library-scan-grid">
+          <label class="field"><span>Automatic scan interval</span><input name="library.scan_interval_seconds" type="number" min="10" step="1"><small>Seconds between discovery passes. Each configured root is checked independently.</small></label>
+          <div class="settings-callout"><strong>Multi-root identity</strong><small>Files are keyed by root + relative path, so <code>Movies\clip.mp4</code> can safely exist on more than one computer or share.</small></div>
+        </div>
+      </section>
+
+      <section class="settings-section" id="settingsAnalysis">
+        <div class="settings-section-title"><span>02</span><div><h3>Analysis engine</h3><p>Auto prefers Hybrid: GPU for frame acquisition, CPU for the correction math.</p></div></div>
+        <div class="settings-grid cols-3">
+          <label class="field"><span>Execution mode</span><select name="analysis.execution_mode"><option>auto</option><option>hybrid</option><option>gpu</option><option>cpu</option></select></label>
+          <label class="field"><span>Auto preference</span><select name="analysis.auto_preference"><option>hybrid</option><option>gpu</option></select></label>
+          <label class="field"><span>GPU device</span><input name="analysis.gpu_device" type="number" min="0" step="1"></label>
+          <label class="field"><span>GPU decode workers</span><input name="analysis.gpu_decode_workers" type="number" min="1" max="8"></label>
+          <label class="field"><span>CPU analysis workers</span><input name="analysis.cpu_analysis_workers" type="number" min="1" max="16"></label>
+          <label class="field"><span>Metadata probe workers</span><input name="analysis.probe_workers" type="number" min="1" max="16"></label>
+          <label class="toggle"><input name="analysis.gpu_fallback_to_cpu" type="checkbox"><span><strong>CPU fallback</strong><small>If GPU decoding dislikes a particular sample, keep going on CPU instead of failing the movie.</small></span></label>
+          <label class="toggle span-2"><input name="analysis.adaptive_workers" type="checkbox"><span><strong>Adaptive worker scheduler</strong><small>Treat worker counts as ceilings and automatically back off/ramp up using CPU, RAM, GPU/NVDEC and NAS-latency pressure.</small></span></label>
+          <label class="toggle span-2"><input name="analysis.isolate_analysis_worker" type="checkbox"><span><strong>Isolate analysis in a worker process</strong><small>Recommended. A native/OpenCV/decoder crash can kill one job without taking the dashboard and queue controller down with it.</small></span></label>
+          <label class="toggle"><input name="analysis.analysis_cache_enabled" type="checkbox"><span><strong>Checkpoint analysis</strong><small>Persist compact probe/full-frame statistics so interrupted analyses can resume. No analysis images are stored.</small></span></label>
+          <label class="field"><span>Checkpoint cache limit (GB)</span><input name="analysis.analysis_cache_max_gb" type="number" min="0.25" max="500" step="0.25"><small>Statistics/checkpoints only; inspector images are decoded live from the source video.</small></label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <div class="settings-section-title"><span>03</span><div><h3>Sampling</h3><p>Quality versus analysis time. The shipped defaults are intentionally generous for 5.7K+ long-form VR.</p></div></div>
+        <div class="settings-grid cols-3">
+          <label class="field"><span>Base/minimum frames</span><input name="analysis.samples" type="number" min="4" max="128"></label>
+          <label class="field"><span>Analysis width</span><input name="analysis.analysis_width" type="number" min="160" max="1920"><small>Pixels across the full source frame.</small></label>
+          <label class="field"><span>Max full samples</span><input name="analysis.max_samples" type="number" min="0"><small>0 = unlimited. Positive values are exact hard ceilings for the expensive full-resolution pass.</small></label>
+          <label class="field"><span>Sample interval (seconds)</span><input name="analysis.sample_interval_seconds" type="number" min="10" max="600" step="1"></label>
+          <label class="toggle span-2"><input name="analysis.adaptive_sampling" type="checkbox"><span><strong>Adaptive sampling</strong><small>Longer videos can use more than the base frame count up to the maximum.</small></span></label>
+          <label class="toggle span-2"><input name="analysis.smart_sampling" type="checkbox"><span><strong>Smart sample rejection</strong><small>Reject fades, black/title-like frames, and near-duplicates before calculating the final grade.</small></span></label>
+          <label class="field"><span>Candidate multiplier</span><input name="analysis.candidate_multiplier" type="number" min="1" max="1.75" step="0.05"><small>Decode a few extra candidates so weak samples can be rejected.</small></label>
+        </div>
+      </section>
+
+      <section class="settings-section" id="settingsImage">
+        <div class="settings-section-title"><span>04</span><div><h3>Native image grade</h3><p>Conservative bounds for white balance, regional tone, saturation, and detail. HereTune uses HereSphere’s native controls rather than baking changes into the video.</p></div></div>
+        <div class="settings-grid cols-3">
+          <label class="field"><span>Strength</span><input name="analysis.strength" type="number" min="0" max="2" step="0.05"></label>
+          <label class="field"><span>Skin priority</span><input name="analysis.skin_priority" type="number" min="0" max="2" step="0.05"></label>
+          <label class="field"><span>Minimum RGB gain</span><input name="analysis.min_rgb_gain" type="number" min="0.5" max="1" step="0.01"></label>
+          <label class="field"><span>Maximum RGB gain</span><input name="analysis.max_rgb_gain" type="number" min="1" max="1.5" step="0.01"></label>
+          <label class="field"><span>Temperature/tint share</span><input name="analysis.temperature_tint_strength" type="number" min="0" max="0.75" step="0.05"><small>How much trusted white balance is expressed through native temperature/tint; RGB gain carries the residual.</small></label>
+          <label class="field"><span>Maximum sharpen</span><input name="analysis.max_sharpen" type="number" min="2" max="5" step="0.1"><small>2.0 is HereSphere’s observed neutral value.</small></label>
+          <label class="toggle"><input name="analysis.white_balance" type="checkbox"><span><strong>White balance</strong><small>Neutral and skin-aware correction.</small></span></label>
+          <label class="toggle"><input name="analysis.temperature_tint" type="checkbox"><span><strong>Native temperature & tint</strong><small>Separate broad warm/cool and green/magenta cast from residual RGB gain.</small></span></label>
+          <label class="toggle"><input name="analysis.tone" type="checkbox"><span><strong>Global tone</strong><small>Contrast and Gamma. Global Offset is not an analyzer degree of freedom; any explicit Offset override is derived separately at HSP output and never participates in tone solving.</small></span></label>
+          <label class="toggle"><input name="analysis.advanced_tone" type="checkbox"><span><strong>Regional tone</strong><small>Exposure bias plus conservative shadow, midtone, and highlight correction.</small></span></label>
+          <label class="toggle"><input name="analysis.saturation" type="checkbox"><span><strong>Saturation</strong><small>Skin-preserving normalization.</small></span></label>
+          <label class="toggle"><input name="analysis.sharpening" type="checkbox"><span><strong>Smart sharpening</strong><small>Measures detail and noise before making a bounded native sharpen adjustment.</small></span></label>
+        </div>
+      </section>
+
+      <section class="settings-section settings-feature-section">
+        <div class="settings-section-title"><span>05</span><div><h3>Per-channel color & sparse scenes</h3><p>Use tiny RGB nonlinear trims for brightness-dependent color casts, then create as many stable grades as the movie genuinely needs. Camera cuts alone do not create grades.</p></div></div>
+        <div class="settings-grid cols-3">
+          <label class="field"><span>Per-channel strength</span><input name="analysis.per_channel_strength" type="number" min="0" max="1" step="0.05"></label>
+          <label class="field"><span>Max channel gamma delta</span><input name="analysis.max_channel_gamma_delta" type="number" min="0" max="0.15" step="0.005"></label>
+          <label class="field"><span>Max channel offset</span><input name="analysis.max_channel_offset" type="number" min="0" max="0.05" step="0.001"></label>
+          <label class="field"><span>Max channel contrast delta</span><input name="analysis.max_channel_contrast_delta" type="number" min="0" max="0.12" step="0.005"></label>
+          <label class="field"><span>Max channel saturation delta</span><input name="analysis.max_channel_saturation_delta" type="number" min="0" max="0.12" step="0.005"></label>
+          <label class="toggle"><input name="analysis.per_channel_color" type="checkbox"><span><strong>Per-channel nonlinear color</strong><small>Small RGB Saturation/Contrast/Gamma/Offset trims after the primary white-balance gain.</small></span></label>
+          <label class="field"><span>Maximum scene grades</span><input name="analysis.scene_max_keyframes" type="number" min="0" step="1"><small>0 = unlimited. Positive values are honored exactly; sustained-state rules prevent micro-grades.</small></label>
+          <label class="field"><span>Minimum scene duration</span><input name="analysis.scene_min_seconds" type="number" min="20" max="900" step="5"><small>Prevents short shots and cuts from becoming twitchy micro-grades.</small></label>
+          <label class="field"><span>Scene change threshold</span><input name="analysis.scene_change_threshold" type="number" min="0.45" max="3" step="0.05"></label>
+          <label class="field"><span>Scene confidence</span><input name="analysis.scene_min_confidence" type="number" min="0.4" max="0.95" step="0.01"></label>
+          <label class="field"><span>Scene probe interval</span><input name="analysis.scene_probe_interval_seconds" type="number" min="4" max="60" step="1"><small>Baseline is 10 seconds. Short/very long videos adapt to roughly 8/15/20 seconds.</small></label>
+          <label class="field"><span>Scene probe width</span><input name="analysis.scene_probe_width" type="number" min="192" max="768" step="16"><small>Low-cost timeline probe only. Full correction analysis still uses Analysis width (960px by default).</small></label>
+          <label class="field"><span>Boundary refinement</span><input name="analysis.scene_boundary_refine_seconds" type="number" min="0.75" max="10" step="0.25"><small>Probe spacing around a suspected transition; 2 seconds is the default.</small></label>
+          <label class="field"><span>Probe persistence</span><input name="analysis.scene_probe_persistence" type="number" min="2" max="6" step="1"><small>How many probes on each side must support a sustained grading-state change.</small></label>
+          <label class="field"><span>Full samples / segment</span><input name="analysis.scene_full_samples_per_segment" type="number" min="4" max="12" step="1"><small>Expensive samples at Analysis width inside each stable segment; default 9.</small></label>
+          <label class="field"><span>Maximum scene probes</span><input name="analysis.scene_probe_max_samples" type="number" min="60" max="2000" step="10"><small>Hard timeline-probe cap for exceptionally long files.</small></label>
+          <label class="toggle span-2"><input name="analysis.scene_grading" type="checkbox"><span><strong>Sparse scene-by-scene grading</strong><small>Dense low-resolution timeline probes find sustained luma/color changes, 2-second refinement locates the boundary, and only stable segments receive full-resolution analysis. This is intentionally not continuous auto white balance.</small></span></label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <div class="settings-section-title"><span>06</span><div><h3>VR framing & orientation</h3><p>Verify packing and projection across multiple frames, remove safe persistent borders through native Zoom/Pan, and measure camera roll without rewriting the source.</p></div></div>
+        <div class="settings-grid cols-3">
+          <label class="field"><span>Verification frames</span><input name="analysis.vr_verification_frames" type="number" min="1" max="7" step="1"><small>Representative frames used for consensus.</small></label>
+          <label class="field"><span>Crop confidence</span><input name="analysis.auto_crop_min_confidence" type="number" min="0.55" max="0.98" step="0.01"></label>
+          <label class="field"><span>Maximum crop zoom</span><input name="analysis.auto_crop_max_zoom" type="number" min="1" max="2" step="0.01"></label>
+          <label class="field"><span>Horizon confidence</span><input name="analysis.horizon_min_confidence" type="number" min="0.5" max="0.98" step="0.01"></label>
+          <label class="field"><span>Maximum horizon correction</span><input name="analysis.horizon_max_degrees" type="number" min="0" max="10" step="0.1"></label>
+          <label class="toggle span-2"><input name="analysis.vr_verification" type="checkbox"><span><strong>Content-based VR verification</strong><small>Cross-check SBS/TB/mono, projection clues, active image bounds, and metadata conflicts across several frames.</small></span></label>
+          <label class="toggle"><input name="analysis.auto_crop" type="checkbox"><span><strong>Safe native border crop</strong><small>Apply bounded Zoom/Pan only for persistent symmetric borders and safe projections.</small></span></label>
+          <label class="toggle"><input name="analysis.orientation_verification" type="checkbox"><span><strong>Orientation verification</strong><small>Detect likely upside-down/rotated footage.</small></span></label>
+          <label class="toggle"><input name="analysis.orientation_auto_apply" type="checkbox"><span><strong>Auto-apply 180° orientation</strong><small>Opt-in; artistic shots can confuse face-based evidence.</small></span></label>
+          <label class="toggle"><input name="analysis.eye_swap_auto_apply" type="checkbox"><span><strong>Auto-apply eye swap</strong><small>Opt-in; eye order remains diagnostic by default.</small></span></label>
+          <label class="toggle"><input name="analysis.horizon_leveling" type="checkbox"><span><strong>Horizon/camera-roll analysis</strong><small>Measure a persistent small roll from stable horizontal scene lines.</small></span></label>
+          <label class="toggle"><input name="analysis.horizon_auto_apply" type="checkbox"><span><strong>Auto-level horizon</strong><small>Opt-in and confidence-gated through the HSP Orientation keyframe.</small></span></label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <div class="settings-section-title"><span>07</span><div><h3>Stereo, stitching & lens calibration</h3><p>Measure eye mismatch, roll, scale, shear, and known fisheye geometry. The risky corrections remain opt-in while vertical eye comfort stays tightly bounded.</p></div></div>
+        <div class="settings-grid cols-3">
+          <label class="field"><span>Alignment confidence</span><input name="analysis.stereo_alignment_min_confidence" type="number" min="0.5" max="0.98" step="0.01"></label>
+          <label class="field"><span>Max vertical correction</span><input name="analysis.stereo_alignment_max_degrees" type="number" min="0" max="2" step="0.05"><small>Degrees; intentionally capped for comfort.</small></label>
+          <label class="field"><span>Max stitch shift</span><input name="analysis.max_stitch_shift" type="number" min="0" max="0.10" step="0.001"></label>
+          <label class="field"><span>Max stitch scale delta</span><input name="analysis.max_stitch_scale_delta" type="number" min="0" max="0.10" step="0.001"></label>
+          <label class="field"><span>Lens/FOV confidence</span><input name="analysis.lens_fov_min_confidence" type="number" min="0.45" max="0.98" step="0.01"></label>
+          <label class="toggle"><input name="analysis.stereo_alignment" type="checkbox"><span><strong>Stereo alignment analysis</strong><small>Measure vertical/horizontal disparity and relative roll.</small></span></label>
+          <label class="toggle"><input name="analysis.stereo_alignment_auto_apply" type="checkbox"><span><strong>Auto-correct vertical disparity</strong><small>Only stable vertical mismatch; horizontal disparity remains untouched depth.</small></span></label>
+          <label class="toggle"><input name="analysis.stereo_roll_correction" type="checkbox"><span><strong>Stereo roll analysis</strong><small>Estimate a persistent relative rotation between eyes.</small></span></label>
+          <label class="toggle"><input name="analysis.stereo_roll_auto_apply" type="checkbox"><span><strong>Auto-correct stereo roll</strong><small>Experimental and OFF by default.</small></span></label>
+          <label class="toggle"><input name="analysis.stereo_scale_correction" type="checkbox"><span><strong>Eye-scale analysis</strong><small>Detect one eye being slightly larger/smaller than the other.</small></span></label>
+          <label class="toggle"><input name="analysis.stereo_scale_auto_apply" type="checkbox"><span><strong>Auto-correct eye scale</strong><small>Experimental and tightly bounded.</small></span></label>
+          <label class="toggle"><input name="analysis.stitch_correction" type="checkbox"><span><strong>Stitch geometry analysis</strong><small>Derive conservative Shift/Scale/Shear/Flare/Slant suggestions.</small></span></label>
+          <label class="toggle"><input name="analysis.stitch_auto_apply" type="checkbox"><span><strong>Auto-apply stitch correction</strong><small>Experimental and OFF by default.</small></span></label>
+          <label class="toggle"><input name="analysis.lens_verification" type="checkbox"><span><strong>Lens/FOV verification</strong><small>Inspect fisheye circle, optical center, crop, and likely FOV family.</small></span></label>
+          <label class="toggle"><input name="analysis.lens_fov_auto_apply" type="checkbox"><span><strong>Auto-apply generic FOV</strong><small>Experimental; known filename/manual lens data still wins.</small></span></label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <div class="settings-section-title"><span>08</span><div><h3>Audio & autofocus</h3><p>Normalize quiet/loud sources through the HSP Audio keyframe, diagnose lip-sync and drift, and derive conservative autofocus bounds from measured stereo depth.</p></div></div>
+        <div class="settings-grid cols-3">
+          <label class="field"><span>Target audio mean</span><input name="analysis.target_audio_mean_db" type="number" min="-32" max="-10" step="0.5"><small>dB; measured from representative windows.</small></label>
+          <label class="field"><span>Maximum audio gain</span><input name="analysis.max_audio_gain" type="number" min="1" max="3" step="0.05"></label>
+          <label class="toggle"><input name="analysis.audio_correction" type="checkbox"><span><strong>Audio analysis</strong><small>Measure representative loudness and timing evidence.</small></span></label>
+          <label class="toggle"><input name="analysis.loudness_normalization" type="checkbox"><span><strong>Native volume normalization</strong><small>Apply a bounded HSP volume multiplier; source audio remains untouched.</small></span></label>
+          <label class="toggle"><input name="analysis.audio_sync_analysis" type="checkbox"><span><strong>A/V sync analysis</strong><small>Correlate face/mouth motion with audio energy where evidence exists.</small></span></label>
+          <label class="toggle"><input name="analysis.audio_sync_auto_apply" type="checkbox"><span><strong>Auto-apply audio timing</strong><small>Experimental and OFF by default until sign/range behavior is calibrated across more native exports.</small></span></label>
+          <label class="toggle"><input name="analysis.autofocus_tuning" type="checkbox"><span><strong>Autofocus depth recommendation</strong><small>Use stereo disparity to recommend a tighter, more stable focus range.</small></span></label>
+          <label class="toggle"><input name="analysis.autofocus_auto_apply" type="checkbox"><span><strong>Auto-apply autofocus range</strong><small>Opt-in; HereSphere’s own autofocus remains the primary system.</small></span></label>
+        </div>
+      </section>
+
+      <section class="settings-section" id="settingsHsp">
+        <div class="settings-section-title"><span>09</span><div><h3>HereSphere & HSP policy</h3><p>Control which measured corrections reach Auto HSPs, whether portable sidecars are exported, and which controls may be overridden for an individual video.</p></div></div>
+        <div class="settings-grid cols-2">
+          <label class="field"><span>Generated HSP version</span><input name="hsp.generated_version" type="number" min="1" max="7" readonly><small>HSP v7 is the validated native format.</small></label>
+          <label class="toggle"><input name="hsp.revisioned_urls" type="checkbox"><span><strong>Revisioned HSP URLs</strong><small>Prevents stale cached corrections after a profile changes.</small></span></label>
+          <label class="toggle"><input name="hsp.accept_hsp_writebacks" type="checkbox"><span><strong>Accept HSP write-backs from HereSphere</strong><small>Advanced and OFF by default. Enabling lets HereSphere send imported/edited HSP bytes back to HereTune; HereTune still suppresses an immediate live HSP reload in that response.</small></span></label>
+          <label class="toggle"><input name="hsp.prefer_manual_writeback" type="checkbox"><span><strong>Prefer accepted manual write-backs</strong><small>Only applies when HSP write-back is enabled. Leave OFF to keep HereTune Auto authoritative until Manual is explicitly selected.</small></span></label>
+          <label class="toggle"><input name="hsp.write_auto_sidecars" type="checkbox"><span><strong>Keep Auto HSP files beside source videos</strong><small>HereTune writes <code>video.hsp</code> atomically after analysis or policy changes. Turning this on also synchronizes existing Ready videos in the background with live progress in the work strip. Leave HereSphere's own automatic HSP writer disabled for the same files; unknown sidecars are never overwritten automatically.</small></span></label>
+          <label class="toggle"><input name="server.compact_heresphere_library_labels" type="checkbox"><span><strong>Compact library folder labels</strong><small>Keep Favorites as ♥ and the full library as All, then show real folder groups as A, B, C… Labels are generated dynamically and no mapping is stored.</small></span></label>
+          <label class="toggle"><input name="server.heresphere_ready_only" type="checkbox"><span><strong>Show only correction-ready videos in HereSphere</strong><small>Hide queued, analyzing, skipped, errored, changed, HSP-less, and missing videos from the HereSphere Web API library. The full queue remains visible in this dashboard.</small></span></label>
+          <label class="toggle"><input name="server.show_hsp_diagnostic_tools" type="checkbox"><span><strong>Show HSP isolation lab in video details</strong><small>Advanced temporary A/B tools for neutralizing individual native Image controls in HereSphere.</small></span></label>
+        </div>
+        <div class="auto-hsp-policy-card">
+          <div class="auto-hsp-policy-heading"><div><strong>Auto HSP output controls</strong><small>These switches decide what reaches the player. Analysis evidence remains stored, so Save can rebuild existing HSPs without re-analyzing any movie.</small></div><span class="calibration-badge caution">SHADOW FLOOR SAFE</span></div>
+          <div class="auto-hsp-policy-grid">
+            <label class="toggle danger-toggle"><input name="hsp.auto_global_offset" type="checkbox"><span><strong>Global offset</strong><small>OFF by default. Explicit enablement serializes only a separate bounded suggestion; it never feeds Gamma, Midtones, Contrast, or the tone solver.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_shadows" type="checkbox"><span><strong>Shadows</strong><small>OFF by default after headset testing; individual videos can Force On.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_midtones" type="checkbox"><span><strong>Midtones</strong><small>Allow native midtone correction.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_highlights" type="checkbox"><span><strong>Highlights</strong><small>Allow native highlight correction.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_global_gamma" type="checkbox"><span><strong>Global gamma</strong><small>Allow whole-image gamma.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_rgb_gamma" type="checkbox"><span><strong>RGB gamma</strong><small>Allow small per-channel gamma trims.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_global_contrast" type="checkbox"><span><strong>Global contrast</strong><small>Allow whole-image contrast.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_rgb_contrast" type="checkbox"><span><strong>RGB contrast</strong><small>Allow small per-channel contrast trims.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_global_saturation" type="checkbox"><span><strong>Global saturation</strong><small>Allow whole-image saturation.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_rgb_saturation" type="checkbox"><span><strong>RGB saturation</strong><small>Allow small per-channel saturation trims.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_exposure" type="checkbox"><span><strong>Exposure</strong><small>Allow native exposure bias.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_temperature" type="checkbox"><span><strong>Temperature</strong><small>Allow warm/cool correction.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_tint" type="checkbox"><span><strong>Tint</strong><small>Allow green/magenta correction.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_rgb_gain" type="checkbox"><span><strong>RGB gain</strong><small>Allow residual white-balance gain.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_rgb_offset" type="checkbox"><span><strong>RGB offset</strong><small>Allow tiny per-channel chroma offsets independently from whole-image Global Offset.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_sharpen" type="checkbox"><span><strong>Sharpen</strong><small>Allow measured native sharpening/softening.</small></span></label>
+            <label class="toggle span-2"><input name="hsp.auto_scene_keyframes" type="checkbox"><span><strong>Sparse scene keyframes</strong><small>Allow sustained scene-by-scene Image grades. When OFF, one whole-video grade is serialized.</small></span></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-section" id="settingsRuntime">
+        <div class="settings-section-title"><span>10</span><div><h3>Server, player & tools</h3><p>Network binding, browser-player behavior, and executable paths. Host, port, and data-dir changes definitely need a restart.</p></div></div>
+        <div class="settings-grid cols-2">
+          <label class="field"><span>Bind host</span><input name="server.host" type="text" spellcheck="false"></label>
+          <label class="field"><span>Port</span><input name="server.port" type="number" min="1" max="65535"></label>
+          <label class="field wide"><span>Public base URL</span><input name="server.public_base_url" type="text" spellcheck="false" placeholder="Leave blank for automatic request URL"></label>
+          <label class="field"><span>Dashboard username</span><input name="server.dashboard_username" type="text" autocomplete="username" spellcheck="false" placeholder="Optional"></label>
+          <label class="field"><span>New dashboard password</span><input name="server.dashboard_password" type="password" autocomplete="new-password" placeholder="Leave blank to keep current"><small>Protects the dashboard/admin API with HTTP Basic auth as soon as Settings is saved.</small></label>
+          <label class="toggle wide"><input name="server.web_player_invert_drag" type="checkbox"><span><strong>Reverse 2D VR drag direction by default</strong><small>Direct pointer movement is the default. The player also has an immediate per-browser toggle remembered locally.</small></span></label>
+          <label class="toggle wide"><input name="server.start_paused" type="checkbox"><span><strong>Start with work paused</strong><small>On the next launch, queue scanning and analysis stay idle until someone clicks <em>Resume work</em>.</small></span></label>
+          <label class="field wide"><span>FFmpeg</span><input name="paths.ffmpeg" type="text" spellcheck="false"></label>
+          <label class="field wide"><span>FFprobe</span><input name="paths.ffprobe" type="text" spellcheck="false"></label>
+          <label class="field wide"><span>Data directory</span><input name="paths.data_dir" type="text" spellcheck="false"></label>
+          <label class="toggle wide danger-toggle"><input name="server.allow_file_delete" type="checkbox"><span><strong>Allow source-file deletion through HereSphere</strong><small>Dangerous. The default is OFF, where it belongs.</small></span></label>
+        </div>
+      </section>
+
+      <div class="settings-footer">
+        <div><strong id="settingsPath">config.toml</strong><small id="settingsHint">Changes are validated before the file is replaced. Restart only when Settings reports it is required.</small></div>
+        <button type="button" class="button primary" id="saveSettingsButton">Save settings</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-stack" id="toasts" aria-live="polite"></div>
+  <script src="/static/app.js?v=0.13.0" defer></script>
+</body>
+</html>

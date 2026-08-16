@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-label="HereTune video placeholder">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111426"/>
+      <stop offset="0.55" stop-color="#181c35"/>
+      <stop offset="1" stop-color="#0b0e1a"/>
+    </linearGradient>
+    <radialGradient id="r" cx="50%" cy="38%" r="60%">
+      <stop offset="0" stop-color="#7c5cff" stop-opacity=".35"/>
+      <stop offset="1" stop-color="#7c5cff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#g)"/>
+  <rect width="1600" height="900" fill="url(#r)"/>
+  <g transform="translate(800 430)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M-230-20c45-170 415-170 460 0 24 91-22 205-105 215-58 7-80-75-125-75s-67 82-125 75c-83-10-129-124-105-215Z" stroke="#b7a7ff" stroke-width="25"/>
+    <circle cx="-105" cy="-20" r="37" stroke="#6ee7ff" stroke-width="20"/>
+    <circle cx="105" cy="-20" r="37" stroke="#6ee7ff" stroke-width="20"/>
+    <path d="M-20-4 62 45-20 94Z" fill="#f6f7ff" stroke="#f6f7ff" stroke-width="10"/>
+  </g>
+  <text x="800" y="720" text-anchor="middle" fill="#f6f7ff" font-family="system-ui, sans-serif" font-size="70" font-weight="800" letter-spacing="6">HERETUNE</text>
+  <text x="800" y="785" text-anchor="middle" fill="#a8afc7" font-family="system-ui, sans-serif" font-size="28" letter-spacing="3">ORIGINAL BYTES • BETTER BEHAVIOR</text>
+</svg>
