@@ -527,11 +527,23 @@ function updateSelectionUi() {
   const bar = $("#selectionBar");
   if (bar) bar.hidden = count === 0;
   if ($("#selectionCount")) $("#selectionCount").textContent = `${fmtNumber(count)} selected`;
-  if ($("#selectionScope")) $("#selectionScope").textContent = state.selectionAllMatching ? `All ${fmtNumber(state.total)} matching videos` : "Selected rows";
   const visibleIds = state.videos.map((video) => String(video.id));
   const visibleSelected = visibleIds.filter((id) => state.selectedIds.has(id)).length;
   const allVisible = visibleIds.length > 0 && visibleSelected === visibleIds.length;
   const someVisible = visibleSelected > 0 && !allVisible;
+  const matchingBeyondPage = Math.max(0, Number(state.total || 0)) > visibleIds.length;
+  if ($("#selectionScope")) {
+    $("#selectionScope").textContent = state.selectionAllMatching
+      ? `All ${fmtNumber(state.total)} matching videos selected`
+      : allVisible && matchingBeyondPage
+        ? `All ${fmtNumber(visibleIds.length)} videos on this page are selected`
+        : "Selected rows";
+  }
+  const allPages = $("#selectAllMatchingButton");
+  if (allPages) {
+    allPages.hidden = !(count > 0 && allVisible && matchingBeyondPage && !state.selectionAllMatching);
+    allPages.textContent = `Select all ${fmtNumber(state.total)} matching videos`;
+  }
   const head = $("#selectVisibleCheckbox");
   if (head) { head.checked = allVisible; head.indeterminate = someVisible; }
   $$('[data-select-video]').forEach((box) => { box.checked = state.selectedIds.has(box.dataset.selectVideo); });
@@ -554,8 +566,14 @@ function currentFilterParams() {
   return params;
 }
 
+function selectCurrentPage() {
+  state.selectionAllMatching = false;
+  state.videos.forEach((video) => state.selectedIds.add(String(video.id)));
+  updateSelectionUi();
+}
+
 async function selectAllMatching() {
-  const button = $("#selectAllButton");
+  const button = $("#selectAllMatchingButton");
   button.disabled = true;
   try {
     const data = await fetchJSON(`/api/video-ids?${currentFilterParams()}`);
@@ -659,6 +677,14 @@ function renderPagination() {
   $("#pageLastButton").disabled = state.page >= pageCount;
   const size = $("#pageSizeSelect");
   if (size && Number(size.value) !== state.limit) size.value = String(state.limit);
+  const jump = $("#pageJumpInput");
+  if (jump) {
+    jump.max = String(pageCount);
+    jump.placeholder = String(state.page);
+    jump.disabled = pageCount <= 1;
+    if (document.activeElement !== jump) jump.value = "";
+  }
+  if ($("#pageJumpButton")) $("#pageJumpButton").disabled = pageCount <= 1;
 }
 
 function goToLibraryPage(page) {
@@ -666,9 +692,24 @@ function goToLibraryPage(page) {
   const next = clamp(Math.round(Number(page || 1)), 1, pageCount);
   if (next === state.page) return;
   state.page = next;
-  clearSelection();
   loadVideos();
   $("#videoTableWrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function jumpToTypedPage() {
+  const input = $("#pageJumpInput");
+  if (!input) return;
+  const pageCount = Math.max(1, Math.ceil(Math.max(0, state.total) / state.limit));
+  const raw = String(input.value || "").trim();
+  if (!raw) return;
+  const requested = Number(raw);
+  if (!Number.isFinite(requested) || requested < 1 || requested > pageCount) {
+    toast(`Enter a page from 1 to ${fmtNumber(pageCount)}.`, "error");
+    input.focus();
+    input.select();
+    return;
+  }
+  goToLibraryPage(Math.round(requested));
 }
 
 let tableScrollSyncing = false;
@@ -1050,24 +1091,30 @@ function hspPolicyHtml(video) {
   const playbackActive = Boolean(video.heresphere_playback_active);
   return `<section class="detail-section hsp-policy-section" id="drawerHspPolicy">
     <div class="detail-section-heading">
-      <div><h3>Auto HSP output policy</h3><p>Choose which measured corrections this video may serialize. Inherit follows Settings; Force On/Off affects only this video and rebuilds from saved evidence without re-analysis.</p></div>
+      <div><h3>Image HSP output policy</h3><p>Choose which measured image-grade corrections this video may serialize. Inherit follows Settings; Force On/Off affects only this video and rebuilds from saved evidence without re-analysis.</p></div>
       <span class="calibration-badge ${overridden ? "medium" : "good"}">${overridden ? "VIDEO OVERRIDES" : "GLOBAL POLICY"}</span>
     </div>
     <div class="policy-safety-note"><strong>Shadow-floor safety defaults</strong><span>Global Offset and Shadows default to OFF. Global Offset remains outside Auto analysis/tone solving; Force On uses only a separate bounded output suggestion. Every control can still inherit, Force On, or Force Off per video.</span></div>
     <div class="hsp-policy-grid">
-      ${controls.map((item) => `<label class="hsp-policy-control ${item.warning ? "caution" : ""}">
-        <span><strong>${escapeHtml(item.label)}</strong><small>Global ${item.global ? "ON" : "OFF"} · Effective ${item.effective ? "ON" : "OFF"}${item.warning ? `<br>${escapeHtml(item.warning)}` : ""}</small></span>
-        <select data-hsp-policy-control="${escapeHtml(item.name)}" aria-label="${escapeHtml(item.label)} policy">
-          <option value="inherit" ${item.override === "inherit" ? "selected" : ""}>Inherit global</option>
-          <option value="on" ${item.override === "on" ? "selected" : ""}>Force on</option>
-          <option value="off" ${item.override === "off" ? "selected" : ""}>Force off</option>
-        </select>
-      </label>`).join("")}
+      ${controls.map((item) => {
+        const override = String(item.override || "inherit");
+        const stateClass = item.effective ? "enabled" : "off";
+        return `<div class="hsp-policy-control ${override !== "inherit" ? "overridden" : ""} ${item.warning ? "caution" : ""}">
+          <div class="native-video-policy-copy">
+            <div><strong>${escapeHtml(item.label)}</strong><span class="native-policy-status ${stateClass}">${item.effective ? "ENABLED" : "OFF"}</span></div>
+            <small>Global ${item.global ? "ON" : "OFF"} · Effective ${item.effective ? "ON" : "OFF"}${item.warning ? `<br>${escapeHtml(item.warning)}` : ""}</small>
+          </div>
+          <div class="native-policy-segment" role="group" aria-label="${escapeHtml(item.label)} policy">
+            <button type="button" data-image-policy-control="${escapeHtml(item.name)}" data-image-policy-value="inherit" class="${override === "inherit" ? "active" : ""}">Global ${item.global ? "ON" : "OFF"}</button>
+            <button type="button" data-image-policy-control="${escapeHtml(item.name)}" data-image-policy-value="on" class="${override === "on" ? "active on" : ""}">On</button>
+            <button type="button" data-image-policy-control="${escapeHtml(item.name)}" data-image-policy-value="off" class="${override === "off" ? "active off" : ""}">Off</button>
+          </div>
+        </div>`;
+      }).join("")}
     </div>
     <div class="hsp-policy-actions">
-      <button class="button primary small" id="applyVideoHspPolicyButton">Save video overrides</button>
-      <button class="button ghost small" id="resetVideoHspPolicyButton">Use global policy</button>
-      <span>${playbackActive ? "This video is open in HereSphere; changes will wait for its playback-close event." : "Changes rebuild this video's Auto HSP from saved evidence without re-analysis."}</span>
+      <button class="button ghost small" id="resetVideoHspPolicyButton">Use all global defaults</button>
+      <span>${playbackActive ? "Changes save immediately but the rebuilt HSP waits until this video closes in HereSphere." : "Changes save immediately and rebuild this video's Auto HSP from saved evidence—no re-analysis."}</span>
     </div>
     <div class="sidecar-hsp-card">
       <div><span class="eyebrow">PORTABLE HSP SIDECAR</span><strong>${sidecar.global_enabled ? "Automatic Auto-HSP export is enabled" : "Per-video export"}</strong><p>${escapeHtml(sidecarState)}</p><small>${escapeHtml(sidecar.path || "")}</small></div>
@@ -1208,6 +1255,21 @@ async function openVideo(videoId) {
     const horizonVerification = video.horizon_verification || {};
     const activeBounds = video.active_image_bounds || {};
     const nativeCalibration = video.native_calibration || {};
+    const nativePolicyItems = Array.isArray(nativeCalibration.output_policy?.controls) ? nativeCalibration.output_policy.controls : [];
+    const nativePolicyByName = Object.fromEntries(nativePolicyItems.map((item) => [item.name, item]));
+    const nativeEnabled = (name) => Boolean(nativePolicyByName[name]?.effective ?? nativePolicyByName[name]?.enabled);
+    const nativePolicySource = (name) => {
+      const item = nativePolicyByName[name] || {};
+      const override = String(item.override || "inherit");
+      if (override === "on") return "video ON · confidence bypass";
+      if (override === "off") return "video OFF";
+      return `global ${item.global ? "ON" : "OFF"}`;
+    };
+    const nativeState = (name, applied, activeText = "applied") => applied
+      ? `${activeText} · ${nativePolicySource(name)}`
+      : nativeEnabled(name)
+        ? `${nativePolicySource(name)} · ${String(nativePolicyByName[name]?.override || "inherit") === "on" ? "no usable correction" : "no qualifying correction"}`
+        : `${nativePolicySource(name)} · diagnostic`;
     const confidence = Math.round(Number(video.confidence || 0) * 100);
     const ready = video.status === "ready" && Object.keys(c).length > 0;
     const modes = ["original", "mild", "auto", "strong", "manual"];
@@ -1250,9 +1312,58 @@ async function openVideo(videoId) {
       ? `${signed(horizonVerification.median_roll_deg || 0, 2)}° measured · ${Math.round(Number(horizonVerification.confidence || 0) * 100)}%`
       : "No stable horizon evidence";
     const autofocusSummary = `${Number(nativeCalibration.autofocus_min_distance || 10).toFixed(1)}–${Number(nativeCalibration.autofocus_max_distance || 1000).toFixed(1)} · speed ${Number(nativeCalibration.autofocus_transition_speed || 1).toFixed(2)}`;
-    const audioSummary = `${Number(c.audio_volume_multiplier ?? nativeCalibration.audio_volume_multiplier ?? 1).toFixed(3)}× volume · ${signed(c.audio_time_offset ?? nativeCalibration.audio_time_offset ?? 0, 3)}s offset`;
+    const audioSummary = `${Number(c.audio_volume_multiplier ?? nativeCalibration.audio_volume_multiplier ?? 1).toFixed(3)}× volume · ${signed(nativeCalibration.audio_time_offset ?? 0, 3)}s offset`;
     const layoutConflictsHtml = (layout.conflicts || []).map((item) => `<div class="calibration-issue">${escapeHtml(item)}</div>`).join("");
     const lensIssuesHtml = (lensVerification.issues || []).map((item) => `<div class="calibration-issue subtle">${escapeHtml(item)}</div>`).join("");
+    const nativeThresholds = nativeCalibration.thresholds || {};
+    const percent = (value) => `${Math.round(Number(value || 0) * 100)}%`;
+    const gateText = (name, confidence) => {
+      const threshold = nativeThresholds[name];
+      const bypassed = String(nativePolicyByName[name]?.override || "inherit") === "on";
+      return threshold === undefined
+        ? `${percent(confidence)} evidence`
+        : `${percent(confidence)} evidence · ${percent(threshold)} global gate${bypassed ? " · bypassed" : ""}`;
+    };
+    const nativeApplied = (name) => {
+      const applied = nativeCalibration.applied || {};
+      const mapping = {
+        stereo_disparity: "vertical_alignment", stereo_roll: "stereo_roll",
+        eye_scale_shear: "eye_scale_shear", stitch_vectors: "stitch", crop: "crop",
+        horizon: "horizon", orientation_180: "orientation_180", eye_swap: "eye_swap",
+        lens_fov: "lens_fov", autofocus: "autofocus",
+      };
+      if (name === "audio_sync") return Boolean(applied.audio_sync || applied.sync_drift);
+      return Boolean(applied[mapping[name] || name]);
+    };
+    const nativeEvidence = {
+      stereo_disparity: gateText("stereo_disparity", alignment.confidence),
+      stereo_roll: gateText("stereo_roll", alignment.confidence),
+      eye_scale_shear: gateText("eye_scale_shear", alignment.stitch_confidence ?? alignment.confidence),
+      stitch_vectors: gateText("stitch_vectors", alignment.stitch_confidence ?? alignment.confidence),
+      crop: gateText("crop", activeBounds.confidence),
+      horizon: gateText("horizon", horizonVerification.confidence),
+      orientation_180: gateText("orientation_180", orientationVerification.confidence),
+      eye_swap: gateText("eye_swap", alignment.eye_swap_confidence),
+      lens_fov: gateText("lens_fov", lensVerification.fov_confidence),
+      autofocus: gateText("autofocus", alignment.autofocus_recommendation?.confidence),
+      audio_sync: `${percent(c.av_sync_confidence)} offset evidence · ${percent(nativeThresholds.audio_sync_offset ?? 0.68)} global gate${String(nativePolicyByName.audio_sync?.override || "inherit") === "on" ? " · bypassed" : ""} · ${percent(c.sync_drift_confidence)} drift evidence · ${percent(nativeThresholds.audio_sync_drift ?? 0.72)} global gate${String(nativePolicyByName.audio_sync?.override || "inherit") === "on" ? " · bypassed" : ""}`,
+    };
+    const nativePolicyControlHtml = (name) => {
+      const item = nativePolicyByName[name] || { name, label: name, global: false, override: "inherit", effective: false };
+      const override = String(item.override || "inherit");
+      const effective = Boolean(item.effective ?? item.enabled);
+      return `<div class="native-video-policy-control ${override !== "inherit" ? "overridden" : ""}">
+        <div class="native-video-policy-copy">
+          <div><strong>${escapeHtml(item.label || name)}</strong><span class="native-policy-status ${nativeApplied(name) ? "applied" : effective ? "enabled" : "off"}">${nativeApplied(name) ? "APPLIED" : effective ? "ENABLED" : "OFF"}</span></div>
+          <small>${escapeHtml(nativeEvidence[name] || "Confidence-gated evidence")} · ${escapeHtml(nativePolicySource(name))}</small>
+        </div>
+        <div class="native-policy-segment" role="group" aria-label="${escapeHtml(item.label || name)} policy">
+          <button type="button" data-native-policy-control="${escapeHtml(name)}" data-native-policy-value="inherit" class="${override === "inherit" ? "active" : ""}">Global ${item.global ? "ON" : "OFF"}</button>
+          <button type="button" data-native-policy-control="${escapeHtml(name)}" data-native-policy-value="on" class="${override === "on" ? "active on" : ""}">On</button>
+          <button type="button" data-native-policy-control="${escapeHtml(name)}" data-native-policy-value="off" class="${override === "off" ? "active off" : ""}">Off</button>
+        </div>
+      </div>`;
+    };
     const sceneCount = Math.max(1, Number(c.scene_count || (Array.isArray(c.scene_keyframes) ? c.scene_keyframes.length : 0) || 1));
     const inspectorSamples = Array.isArray(inspector?.samples) ? inspector.samples : [];
     const inspectorAccepted = inspectorSamples.filter((item) => item.accepted).length;
@@ -1353,20 +1464,41 @@ async function openVideo(videoId) {
         </div>
       </section>
       <section class="detail-section layout-debug-section" id="drawerVr">
-        <div class="detail-section-heading"><div><h3>VR verification & native calibration</h3><p>Framing, eye geometry, lens boundaries, horizon, autofocus, and audio controls are independently confidence-gated.</p></div><button class="button small ghost" id="regenerateThumbButton">Regenerate preview</button></div>
+        <div class="detail-section-heading"><div><h3>VR verification & native calibration</h3><p>Global automatic corrections are confidence-gated. A per-video On is an explicit override that bypasses the confidence gate for that title.</p></div><button class="button small ghost" id="regenerateThumbButton">Regenerate preview</button></div>
         <div class="calibration-summary-grid">
           ${detailCard("Resolved layout", `${resolvedLayout.stereo || video.stereo} / ${resolvedLayout.projection || video.projection}`, `${layout.verification || "cached"} · ${Math.round(Number(layout.confidence || 0) * 100)}%`)}
-          ${detailCard("Stereo disparity", alignmentSummary, `${Math.round(Number(alignment.confidence || 0) * 100)}% · ${nativeCalibration.alignment_applied ? "vertical correction applied" : "diagnostic"}`)}
-          ${detailCard("Eye scale / shear", scaleSummary, nativeCalibration.stereo_scale_applied ? "native stitch scale applied" : "diagnostic / neutral")}
-          ${detailCard("Stitch vectors", stitchSummary, `${stitchSecondary} · ${nativeCalibration.stitch_applied ? "applied" : "diagnostic / neutral"}`)}
-          ${detailCard("Encoded bounds", borderSummary, `${cropSummary} · ${nativeCalibration.auto_crop_applied ? "applied" : "diagnostic"}`)}
-          ${detailCard("Horizon", horizonSummary, `${fmtVector(nativeCalibration.orientation_rotation, 3)} rotation · ${nativeCalibration.horizon_leveling_applied ? "applied" : "diagnostic"}`)}
-          ${detailCard("Lens / FOV", lensSummary, lensVerification.known_profile ? "known profile retained" : nativeCalibration.lens_fov_applied ? "suggested FOV applied" : "verified only")}
-          ${detailCard("Autofocus range", autofocusSummary, nativeCalibration.autofocus_applied ? "native range applied" : "recommendation only")}
-          ${detailCard("Orientation", orientationVerification.rotate_180_suspected ? "180° rotation suspected" : "No strong 180° evidence", `${orientationVerification.upright_faces || 0} upright / ${orientationVerification.rotated_faces || 0} rotated face hits`)}
+          ${detailCard("Stereo disparity", alignmentSummary, `${Math.round(Number(alignment.confidence || 0) * 100)}% · ${nativeState("stereo_disparity", nativeCalibration.applied?.vertical_alignment, "vertical correction applied")}`)}
+          ${detailCard("Eye scale / shear", scaleSummary, nativeState("eye_scale_shear", nativeCalibration.stereo_scale_applied, "native scale/shear applied"))}
+          ${detailCard("Stitch vectors", stitchSummary, `${stitchSecondary} · ${nativeState("stitch_vectors", nativeCalibration.stitch_applied)}`)}
+          ${detailCard("Encoded bounds", borderSummary, `${cropSummary} · ${nativeState("crop", nativeCalibration.auto_crop_applied)}`)}
+          ${detailCard("Horizon", horizonSummary, `${fmtVector(nativeCalibration.orientation_rotation, 3)} rotation · ${nativeState("horizon", nativeCalibration.horizon_leveling_applied)}`)}
+          ${detailCard("Lens / FOV", lensSummary, lensVerification.known_profile ? "known profile retained" : nativeState("lens_fov", nativeCalibration.lens_fov_applied, "suggested FOV applied"))}
+          ${detailCard("Autofocus range", autofocusSummary, nativeState("autofocus", nativeCalibration.autofocus_applied, "native range applied"))}
+          ${detailCard("Eye order", alignment.eye_swap_suspected ? "Eye swap suspected" : "No strong swap evidence", `${Math.round(Number(alignment.eye_swap_confidence || 0) * 100)}% · ${nativeState("eye_swap", nativeCalibration.applied?.eye_swap, "eye swap applied")}`)}
+          ${detailCard("Orientation", orientationVerification.rotate_180_suspected ? "180° rotation suspected" : "No strong 180° evidence", `${orientationVerification.upright_faces || 0} upright / ${orientationVerification.rotated_faces || 0} rotated face hits · ${nativeState("orientation_180", nativeCalibration.applied?.orientation_180, "180° correction applied")}`)}
         </div>
         ${layoutConflictsHtml || lensIssuesHtml ? `<div class="calibration-issues">${layoutConflictsHtml}${lensIssuesHtml}</div>` : ""}
-        <div class="calibration-policy"><strong>Comfort-first defaults:</strong> stable vertical disparity and safe symmetric borders may be corrected automatically. Horizontal disparity remains real depth; roll, scale, stitch, horizon, autofocus, eye order, and generic FOV are opt-in unless manually overridden.</div>
+        <div class="native-video-policy-card">
+          <div class="native-video-policy-heading">
+            <div><strong>Try native suggestions on this video</strong><small>Global keeps the Settings choice. On/Off creates a persistent override for this video and rebuilds its Auto HSP immediately from saved evidence—no re-analysis.</small></div>
+            <button type="button" class="button ghost small" id="resetVideoNativePolicyButton">Use all global defaults</button>
+          </div>
+          <div class="native-video-policy-grid">
+            ${nativePolicyControlHtml("stereo_disparity")}
+            ${nativePolicyControlHtml("stereo_roll")}
+            ${nativePolicyControlHtml("eye_scale_shear")}
+            ${nativePolicyControlHtml("stitch_vectors")}
+            ${nativePolicyControlHtml("crop")}
+            ${nativePolicyControlHtml("horizon")}
+            ${nativePolicyControlHtml("orientation_180")}
+            ${nativePolicyControlHtml("eye_swap")}
+            ${nativePolicyControlHtml("lens_fov")}
+            ${nativePolicyControlHtml("autofocus")}
+            ${nativePolicyControlHtml("audio_sync")}
+          </div>
+          <div class="native-video-policy-note"><strong>Per-video On means On.</strong><span>It bypasses the confidence threshold for this video while retaining hard validity checks such as usable measurements, finite/range-safe values, compatible projection, and explicit manual metadata. Global automatic On remains confidence-gated. Advanced numeric overrides below remain authoritative.</span></div>
+        </div>
+        <div class="calibration-policy"><strong>Confidence-gated global automation:</strong> stereo disparity and safe encoded-border crop preserve the v0.13.0 global defaults. Use per-video On when you want to audition a lower-confidence suggestion anyway.</div>
         <details class="layout-override-details">
           <summary><span>Advanced per-video HSP override</span><small>Format, framing, alignment, stitch, focus, audio and sync. Empty fields remain Auto.</small></summary>
           <div class="override-group">
@@ -1439,8 +1571,16 @@ async function openVideo(videoId) {
       setHspDiagnostic(video.id, disabled);
     });
     $("#resetHspDiagnosticButton")?.addEventListener("click", () => setHspDiagnostic(video.id, []));
-    $("#applyVideoHspPolicyButton")?.addEventListener("click", () => setVideoHspPolicy(video.id, false));
-    $("#resetVideoHspPolicyButton")?.addEventListener("click", () => setVideoHspPolicy(video.id, true));
+    $$('[data-image-policy-control]').forEach((button) => button.addEventListener("click", () => {
+      if (button.classList.contains("active")) return;
+      setVideoImageHspPolicy(video.id, button.dataset.imagePolicyControl, button.dataset.imagePolicyValue);
+    }));
+    $("#resetVideoHspPolicyButton")?.addEventListener("click", () => setVideoImageHspPolicy(video.id, null, "inherit", true));
+    $$('[data-native-policy-control]').forEach((button) => button.addEventListener("click", () => {
+      if (button.classList.contains("active")) return;
+      setVideoNativeHspPolicy(video.id, button.dataset.nativePolicyControl, button.dataset.nativePolicyValue);
+    }));
+    $("#resetVideoNativePolicyButton")?.addEventListener("click", () => setVideoNativeHspPolicy(video.id, null, "inherit", true));
     $("#writeSidecarHspButton")?.addEventListener("click", () => writeSidecarHsp(video.id));
     $("#removeSidecarHspButton")?.addEventListener("click", () => removeSidecarHsp(video.id));
     $("#favoriteToggle").addEventListener("click", () => updateLibraryState(video.id, { is_favorite: !video.is_favorite }));
@@ -1614,32 +1754,89 @@ async function setProfile(videoId, mode) {
   }
 }
 
-async function setVideoHspPolicy(videoId, reset = false) {
+async function setVideoImageHspPolicy(videoId, control, value = "inherit", reset = false) {
+  const panel = document.querySelector("#drawer .drawer-panel");
+  const scrollTop = panel?.scrollTop || 0;
+  const clicked = control
+    ? $$(`[data-image-policy-control="${CSS.escape(String(control))}"]`)
+    : $$('[data-image-policy-control]');
+  clicked.forEach((button) => { button.disabled = true; });
   try {
-    const overrides = {};
-    if (!reset) {
-      $$('[data-hsp-policy-control]').forEach((select) => {
-        const value = String(select.value || "inherit");
-        if (value !== "inherit") overrides[String(select.dataset.hspPolicyControl)] = value;
+    let body;
+    if (reset) {
+      body = { reset: true };
+    } else {
+      const overrides = {};
+      const names = [...new Set($$('[data-image-policy-control]').map((button) => String(button.dataset.imagePolicyControl || "")))].filter(Boolean);
+      names.forEach((name) => {
+        let selected = name === String(control || "") ? String(value || "inherit") : "inherit";
+        if (name !== String(control || "")) {
+          const active = document.querySelector(`[data-image-policy-control="${CSS.escape(name)}"].active`);
+          selected = String(active?.dataset.imagePolicyValue || "inherit");
+        }
+        if (selected !== "inherit") overrides[name] = selected;
       });
+      body = { overrides };
     }
     const result = await fetchJSON(`/api/videos/${encodeURIComponent(videoId)}/hsp-policy`, {
       method: "PATCH",
-      body: JSON.stringify(reset ? { reset: true } : { overrides }),
+      body: JSON.stringify(body),
     });
     const update = result.policy_update || {};
+    const label = control
+      ? (result.auto_hsp_policy?.controls || []).find((item) => item.name === control)?.label || control
+      : "Image HSP policy";
+    const choice = reset ? "returned to global defaults" : value === "inherit" ? "returned to its global setting" : `forced ${String(value).toUpperCase()} for this video`;
     toast(
       update.deferred_until_close
-        ? "Video policy saved. HereSphere is using this video, so the rebuilt HSP will be applied after it closes."
-        : reset
-          ? "Video HSP policy reset to the global defaults."
-          : "Video HSP policy saved and Auto HSP rebuilt from existing evidence.",
+        ? `${label} ${choice}. HereSphere is using this video, so the rebuilt HSP will apply after it closes.`
+        : `${label} ${choice}. Auto HSP rebuilt from saved evidence.`,
       "success",
     );
     await loadVideos();
     await openVideo(videoId);
+    window.requestAnimationFrame(() => {
+      const refreshed = document.querySelector("#drawer .drawer-panel");
+      if (refreshed) refreshed.scrollTop = scrollTop;
+    });
   } catch (error) {
-    toast(`Could not save video HSP policy: ${error.message}`, "error");
+    clicked.forEach((button) => { button.disabled = false; });
+    toast(`Could not save image HSP policy: ${error.message}`, "error");
+  }
+}
+
+async function setVideoNativeHspPolicy(videoId, control, value = "inherit", reset = false) {
+  const panel = document.querySelector("#drawer .drawer-panel");
+  const scrollTop = panel?.scrollTop || 0;
+  const clicked = control
+    ? $$(`[data-native-policy-control="${CSS.escape(String(control))}"]`)
+    : $$('[data-native-policy-control]');
+  clicked.forEach((button) => { button.disabled = true; });
+  try {
+    const result = await fetchJSON(`/api/videos/${encodeURIComponent(videoId)}/native-hsp-policy`, {
+      method: "PATCH",
+      body: JSON.stringify(reset ? { reset: true } : { control, value }),
+    });
+    const update = result.policy_update || {};
+    const label = control
+      ? (result.native_calibration?.output_policy?.controls || []).find((item) => item.name === control)?.label || control
+      : "Native calibration";
+    const choice = reset ? "returned to global defaults" : value === "inherit" ? "returned to its global setting" : `forced ${String(value).toUpperCase()} for this video`;
+    toast(
+      update.deferred_until_close
+        ? `${label} ${choice}. HereSphere is using this video, so the rebuilt HSP will apply after it closes.`
+        : `${label} ${choice}. Auto HSP rebuilt from saved evidence.`,
+      "success",
+    );
+    await loadVideos();
+    await openVideo(videoId);
+    window.requestAnimationFrame(() => {
+      const refreshed = document.querySelector("#drawer .drawer-panel");
+      if (refreshed) refreshed.scrollTop = scrollTop;
+    });
+  } catch (error) {
+    clicked.forEach((button) => { button.disabled = false; });
+    toast(`Could not save native calibration policy: ${error.message}`, "error");
   }
 }
 
@@ -1827,12 +2024,25 @@ async function showDoctor(initialTab = "checks") {
   if (!dialog.open) dialog.showModal();
   setDoctorTab(initialTab);
   if (initialTab !== "checks" && $("#doctorResults").children.length) return;
-  $("#doctorResults").innerHTML = "Running checks…";
+  $("#doctorOverview").innerHTML = '<div class="doctor-loading"><span></span><div><strong>Running diagnostics…</strong><small>Checking runtime, FFmpeg, acceleration, HSP serialization, and storage paths.</small></div></div>';
+  $("#doctorResults").innerHTML = "";
   try {
     const data = await fetchJSON("/api/doctor");
-    $("#doctorResults").innerHTML = data.checks.map((check) => `<div class="doctor-check"><span class="${check.ok ? "yes" : "no"}">${check.ok ? "✓" : "×"}</span><strong>${escapeHtml(check.name)}</strong><small>${escapeHtml(check.detail || "")}${check.version ? `<br>${escapeHtml(check.version)}` : ""}</small></div>`).join("");
+    const checks = Array.isArray(data.checks) ? data.checks : [];
+    const passed = checks.filter((check) => check.ok).length;
+    const failed = Math.max(0, checks.length - passed);
+    $("#doctorOverview").innerHTML = `<div class="doctor-overview-card ${failed ? "caution" : "good"}">
+      <div class="doctor-overview-icon">${failed ? "!" : "✓"}</div>
+      <div><span class="eyebrow">${failed ? "ATTENTION RECOMMENDED" : "SYSTEMS READY"}</span><strong>${failed ? `${failed} check${failed === 1 ? "" : "s"} need attention` : "HereTune looks healthy"}</strong><small>${passed}/${checks.length} diagnostics passed${failed ? ". Review the highlighted cards below before blaming the tiny unpaid colorist." : ". Runtime, media tools, and native-HSP plumbing are reporting ready."}</small></div>
+      <div class="doctor-score"><b>${passed}</b><span>passed</span></div>
+    </div>`;
+    $("#doctorResults").innerHTML = `<div class="doctor-check-grid">${checks.map((check) => `<article class="doctor-check-card ${check.ok ? "good" : "bad"}">
+      <span class="doctor-check-mark">${check.ok ? "✓" : "×"}</span>
+      <div><strong>${escapeHtml(check.name)}</strong><small>${escapeHtml(check.detail || "")}</small>${check.version ? `<code>${escapeHtml(check.version)}</code>` : ""}</div>
+    </article>`).join("")}</div>`;
   } catch (error) {
-    $("#doctorResults").textContent = error.message;
+    $("#doctorOverview").innerHTML = `<div class="doctor-overview-card bad"><div class="doctor-overview-icon">×</div><div><span class="eyebrow">DIAGNOSTICS FAILED</span><strong>Doctor could not complete its checks</strong><small>${escapeHtml(error.message)}</small></div></div>`;
+    $("#doctorResults").innerHTML = "";
   }
 }
 
@@ -2096,6 +2306,36 @@ function setSettingValue(name, value) {
   }
 }
 
+const SETTINGS_NAV_IDS = ["settingsLibrary", "settingsAnalysis", "settingsImage", "settingsVr", "settingsHsp", "settingsRuntime"];
+
+function updateSettingsNavActive() {
+  const dialog = $("#settingsDialog");
+  if (!dialog?.open) return;
+  const marker = dialog.getBoundingClientRect().top + 132;
+  let activeId = SETTINGS_NAV_IDS.find((id) => !document.getElementById(id)?.hidden) || SETTINGS_NAV_IDS[0];
+  for (const id of SETTINGS_NAV_IDS) {
+    const section = document.getElementById(id);
+    if (!section || section.hidden) continue;
+    if (section.getBoundingClientRect().top <= marker) activeId = id;
+  }
+  $$('[data-settings-nav]').forEach((link) => link.classList.toggle('active', link.dataset.settingsNav === activeId));
+}
+
+function filterSettingsSections() {
+  const input = $("#settingsSearch");
+  const query = String(input?.value || "").trim().toLocaleLowerCase();
+  let visible = 0;
+  $$("#settingsForm .settings-section").forEach((section) => {
+    const haystack = `${section.textContent || ""} ${Array.from(section.querySelectorAll('[name]')).map((node) => node.name || "").join(" ")}`.toLocaleLowerCase();
+    const match = !query || haystack.includes(query);
+    section.hidden = !match;
+    if (match) visible += 1;
+  });
+  const empty = $("#settingsSearchEmpty");
+  if (empty) empty.hidden = visible > 0;
+  updateSettingsNavActive();
+}
+
 function fillSettings(data) {
   state.configPayload = data;
   renderSettingsPresets(data);
@@ -2119,6 +2359,11 @@ function fillSettings(data) {
 async function showSettings() {
   const dialog = $("#settingsDialog");
   dialog.showModal();
+  const search = $("#settingsSearch");
+  if (search) search.value = "";
+  filterSettingsSections();
+  dialog.scrollTop = 0;
+  requestAnimationFrame(updateSettingsNavActive);
   $("#saveSettingsButton").disabled = true;
   try {
     const data = await fetchJSON("/api/config");
@@ -2359,16 +2604,25 @@ $("#pageSizeSelect").addEventListener("change", (event) => {
   clearSelection();
   loadVideos();
 });
+$("#pageJumpButton").addEventListener("click", jumpToTypedPage);
+$("#pageJumpInput").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    jumpToTypedPage();
+  }
+});
 $("#scanButton").addEventListener("click", scanLibrary);
 $("#pauseWorkButton").addEventListener("click", toggleWorkPause);
 $("#analyzeAllButton").addEventListener("click", requeueErrors);
-$("#selectAllButton").addEventListener("click", selectAllMatching);
+$("#selectAllButton").addEventListener("click", selectCurrentPage);
+$("#selectAllMatchingButton").addEventListener("click", selectAllMatching);
 $("#selectVisibleCheckbox").addEventListener("change", (event) => {
   state.selectionAllMatching = false;
-  state.videos.forEach((video) => {
-    const id = String(video.id);
-    if (event.target.checked) state.selectedIds.add(id); else state.selectedIds.delete(id);
-  });
+  if (event.target.checked) {
+    selectCurrentPage();
+    return;
+  }
+  state.videos.forEach((video) => state.selectedIds.delete(String(video.id)));
   updateSelectionUi();
 });
 $("#prioritizeSelectionButton").addEventListener("click", prioritizeSelection);
@@ -2378,6 +2632,15 @@ $("#doctorButton").addEventListener("click", () => showDoctor("checks"));
 $$('[data-doctor-tab]').forEach((button) => button.addEventListener('click', () => setDoctorTab(button.dataset.doctorTab)));
 $("#queueButton").addEventListener("click", showPriorityQueue);
 $("#refreshHealthButton").addEventListener("click", loadLibraryHealth);
+$("#settingsSearch")?.addEventListener("input", filterSettingsSections);
+$("#settingsDialog")?.addEventListener("scroll", () => requestAnimationFrame(updateSettingsNavActive));
+$$('[data-settings-nav]').forEach((link) => link.addEventListener('click', (event) => {
+  event.preventDefault();
+  const section = document.getElementById(link.dataset.settingsNav || "");
+  if (!section || section.hidden) return;
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $$('[data-settings-nav]').forEach((item) => item.classList.toggle('active', item === link));
+}));
 $("#settingsButton").addEventListener("click", showSettings);
 $("#footerSettingsButton")?.addEventListener("click", showSettings);
 $("#footerDoctorButton")?.addEventListener("click", () => showDoctor("checks"));
@@ -2413,6 +2676,13 @@ $("#copyUrl").addEventListener("click", async () => {
     toast("Automatic copy was blocked. The URL is selected so you can press Ctrl+C.", "error");
   }
 });
+$$('[data-close-dialog]').forEach((button) => button.addEventListener("click", () => {
+  const dialog = button.closest("dialog");
+  if (!dialog) return;
+  if (dialog.id === "tourDialog") { finishTour(); return; }
+  dialog.close();
+}));
+$("#tourDialog")?.addEventListener("cancel", (event) => { event.preventDefault(); finishTour(); });
 $$('[data-close-drawer]').forEach((node) => node.addEventListener("click", closeDrawer));
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeDrawer();

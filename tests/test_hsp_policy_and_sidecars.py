@@ -125,7 +125,7 @@ def _path_and_query(url: str) -> str:
 
 
 def test_version_and_engine_invariants():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     assert ANALYSIS_VERSION == "offset-free-tone-1"
 
 
@@ -460,6 +460,73 @@ def test_per_video_policy_api_rebuilds_from_evidence_without_reanalysis(tmp_path
         assert reset_image.gamma[3] == pytest.approx(0.97)
 
 
+def test_per_video_native_policy_api_rebuilds_geometry_and_preserves_image_overrides(tmp_path: Path):
+    app, _, db, video_id, _ = _ready_app(tmp_path)
+    row = db.get(video_id)
+    metadata = dict(row["metadata"] or {})
+    metadata.update({
+        "projection": "perspective",
+        "stereo": "sbs",
+        "stereo_alignment": {
+            "frames": 4,
+            "confidence": 0.94,
+            "auto_applicable": True,
+            "suggested_rotation": (0.40, 0.0, 0.0),
+        },
+        "active_image_bounds": {
+            "confidence": 0.95,
+            "auto_applicable": True,
+            "suggested_zoom": (1.10, 1.08),
+            "suggested_pan": (-0.02, 0.01),
+        },
+        "horizon_verification": {
+            "confidence": 0.92,
+            "auto_applicable": True,
+            "suggested_orientation_rotation": (0.0, 0.0, 1.25),
+        },
+    })
+    db.exec("UPDATE videos SET metadata_json=? WHERE id=?", (json.dumps(metadata), video_id))
+
+    with TestClient(app) as client:
+        response = client.patch(
+            f"/api/videos/{video_id}/native-hsp-policy",
+            json={"overrides": {"stereo_disparity": "off", "crop": "off", "horizon": "on"}},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["policy_update"]["rebuilt"] is True
+        controls = {item["name"]: item for item in payload["native_calibration"]["output_policy"]["controls"]}
+        assert controls["stereo_disparity"]["override"] == "off"
+        assert controls["crop"]["override"] == "off"
+        assert controls["horizon"]["override"] == "on"
+        parsed = inspect(db.get(video_id)["auto_hsp"])
+        assert parsed.alignment_keyframes[0].rotation == pytest.approx((0.0, 0.0, 0.0), abs=1e-5)
+        assert parsed.format_keyframes[0].zoom == pytest.approx((1.0, 1.0), abs=1e-5)
+        assert parsed.orientation_keyframes[0].orientation == pytest.approx((0.0, 0.0, 1.25), abs=1e-5)
+
+        # Image-policy edits must not wipe the native choices stored in the same JSON column.
+        image = client.patch(
+            f"/api/videos/{video_id}/hsp-policy",
+            json={"overrides": {"shadows": "on"}},
+        )
+        assert image.status_code == 200
+        stored = db.get(video_id)["hsp_policy_override"]
+        assert stored["shadows"] == "on"
+        assert stored["stereo_disparity"] == "off"
+        assert stored["crop"] == "off"
+        assert stored["horizon"] == "on"
+
+        reset = client.patch(f"/api/videos/{video_id}/native-hsp-policy", json={"reset": True})
+        assert reset.status_code == 200
+        stored = db.get(video_id)["hsp_policy_override"]
+        assert stored == {"shadows": "on"}
+        controls = {item["name"]: item for item in reset.json()["native_calibration"]["output_policy"]["controls"]}
+        assert controls["stereo_disparity"]["override"] == "inherit"
+        assert controls["stereo_disparity"]["effective"] is True
+        assert controls["crop"]["effective"] is True
+        assert controls["horizon"]["effective"] is False
+
+
 def test_isolation_lab_can_neutralize_explicit_global_offset(tmp_path: Path):
     app, _, db, video_id, _ = _ready_app(tmp_path)
     row = db.get(video_id)
@@ -554,12 +621,15 @@ def test_ui_and_worker_safety_surfaces_are_packaged():
     assert 'name="hsp.write_auto_sidecars"' in html
     assert 'name="hsp.auto_global_offset"' in html
     assert "Global offset" in html and "OFF by default" in html
-    assert "Save video overrides" in js
-    assert "Force on" in js and "Force off" in js
+    assert 'data-image-policy-control=' in js
+    assert 'data-image-policy-value="inherit"' in js
+    assert 'data-image-policy-value="on"' in js
+    assert 'data-image-policy-value="off"' in js
+    assert "Use all global defaults" in js
     assert "Save Auto HSP beside source file" in js
     assert "No Global Offset" in js
     assert '"offset_global"' in js
-    assert "setVideoHspPolicy" in js
+    assert "setVideoImageHspPolicy" in js
     assert "writeSidecarHsp" in js
     assert ".hsp-policy-grid" in css
     assert ".sidecar-hsp-card" in css

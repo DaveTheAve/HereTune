@@ -208,13 +208,9 @@ def detect_layout_from_video(
             int(metadata.get("height") or 0),
             metadata,
             orientation_verification=bool(getattr(analysis_cfg, "orientation_verification", True)),
-            orientation_auto_apply=bool(getattr(analysis_cfg, "orientation_auto_apply", False)),
             stereo_alignment=bool(getattr(analysis_cfg, "stereo_alignment", True)),
             stereo_alignment_max_degrees=float(getattr(analysis_cfg, "stereo_alignment_max_degrees", 0.75)),
             lens_verification=bool(getattr(analysis_cfg, "lens_verification", True)),
-            auto_apply_eye_swap=bool(getattr(analysis_cfg, "eye_swap_auto_apply", False)),
-            lens_fov_auto_apply=bool(getattr(analysis_cfg, "lens_fov_auto_apply", False)),
-            lens_fov_min_confidence=float(getattr(analysis_cfg, "lens_fov_min_confidence", 0.80)),
             horizon_leveling=bool(getattr(analysis_cfg, "horizon_leveling", True)),
         )
     except Exception as exc:

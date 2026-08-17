@@ -17,7 +17,7 @@ def _auth(user: str, password: str) -> dict[str, str]:
 
 def test_public_defaults_and_presets():
     cfg = Config()
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     assert cfg.library.roots == []
     assert cfg.analysis.analysis_width == 960
     presets = analysis_presets()

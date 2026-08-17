@@ -53,8 +53,11 @@ from .hsp import (
 from .library import Library
 from .hsp_policy import (
     AUTO_IMAGE_CONTROLS,
+    AUTO_NATIVE_CONTROLS,
     apply_auto_image_policy,
+    normalize_native_policy_overrides,
     normalize_policy_overrides,
+    native_policy_payload,
     policy_payload,
     policy_signature,
 )
@@ -496,6 +499,32 @@ def parse_byte_range(header: str | None, size: int) -> tuple[int, int] | None:
 
 
 
+def _ascii_filename_fallback(filename: str, *, fallback: str = "file") -> str:
+    """Return a conservative ASCII filename suitable for legacy HTTP headers.
+
+    Starlette serializes response headers as latin-1. Media titles are user-controlled
+    filesystem data and may contain arbitrary Unicode, so the quoted ``filename=``
+    fallback must never contain the original text verbatim. The authoritative name is
+    carried separately by RFC 5987 ``filename*=UTF-8''...``.
+    """
+    raw = Path(str(filename)).name
+    allowed = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._ -")
+    safe = "".join(ch if ch in allowed else "_" for ch in raw)
+    safe = re.sub(r"_+", "_", safe).strip(" .")
+    if not safe:
+        suffix = Path(raw).suffix
+        safe = f"{fallback}{suffix if suffix and suffix.isascii() else ''}"
+    return safe[:180]
+
+
+def _inline_content_disposition(filename: str, *, fallback: str = "file") -> str:
+    """Build an ASCII-only Content-Disposition with a UTF-8 RFC 5987 filename."""
+    raw = Path(str(filename)).name
+    ascii_name = _ascii_filename_fallback(raw, fallback=fallback)
+    encoded = quote(raw, safe="")
+    return 'inline; filename="' + ascii_name + '"; filename*=UTF-8\'\'' + encoded
+
+
 def _media_response(video: dict[str, object], request: Request, cfg) -> Response:
     path = Path(str(video["path"]))
     try:
@@ -512,7 +541,7 @@ def _media_response(video: dict[str, object], request: Request, cfg) -> Response
         "Last-Modified": datetime.fromtimestamp(
             stat.st_mtime, tz=timezone.utc
         ).strftime("%a, %d %b %Y %H:%M:%S GMT"),
-        "Content-Disposition": f'inline; filename="{path.name.replace(chr(34), "_")}"',
+        "Content-Disposition": _inline_content_disposition(path.name, fallback="media"),
         "X-HereTune-Original": "1",
         "X-HereTune-Transcoded": "0",
     }
@@ -1901,6 +1930,22 @@ def _video_view(video: dict[str, object], cfg) -> dict[str, object]:
             "flip_front_back": bool(native_metadata.get("flip_front_back", False)),
             "flip_left_right": bool(native_metadata.get("flip_left_right", False)),
             "flip_up_down": bool(native_metadata.get("flip_up_down", False)),
+            "thresholds": {
+                "stereo_disparity": float(getattr(cfg.analysis, "stereo_alignment_min_confidence", 0.72)),
+                "stereo_roll": max(0.68, float(getattr(cfg.analysis, "stereo_alignment_min_confidence", 0.72)) * 0.92),
+                "eye_scale_shear": max(0.72, float(getattr(cfg.analysis, "stereo_alignment_min_confidence", 0.72))),
+                "stitch_vectors": max(0.72, float(getattr(cfg.analysis, "stereo_alignment_min_confidence", 0.72))),
+                "crop": float(getattr(cfg.analysis, "auto_crop_min_confidence", 0.82)),
+                "horizon": float(getattr(cfg.analysis, "horizon_min_confidence", 0.78)),
+                "orientation_180": 0.82,
+                "eye_swap": 0.86,
+                "lens_fov": float(getattr(cfg.analysis, "lens_fov_min_confidence", 0.80)),
+                "autofocus": 0.72,
+                "audio_sync_offset": 0.68,
+                "audio_sync_drift": 0.72,
+            },
+            "output_policy": native_policy_payload(cfg, video.get("hsp_policy_override") or {}),
+            "applied": dict(native_metadata.get("native_calibration_applied") or {}),
         },
         "layout_override": video.get("layout_override") or {},
         "content_fingerprint": video.get("content_fingerprint"),
@@ -3363,6 +3408,49 @@ def create_app(cfg) -> FastAPI:
             view["duplicates"] = []
         return view
 
+    def persist_video_hsp_policy(
+        video_id: str,
+        video: dict[str, object],
+        overrides: dict[str, str],
+        *,
+        reason: str,
+    ) -> dict[str, object]:
+        """Persist mixed Image/native policy overrides and rebuild safely."""
+        db.exec(
+            "UPDATE videos SET hsp_policy_override_json=? WHERE id=?",
+            (json.dumps(overrides) if overrides else None, video_id),
+        )
+        active = _video_is_active(app, video_id)
+        rebuilt = False
+        sidecar_written = False
+        if active:
+            app.state.pending_hsp_rebuild.add(video_id)
+        else:
+            updated = db.get(video_id)
+            blob = _rebuild_auto_hsp(updated or video, cfg)
+            if blob is not None:
+                db.exec(
+                    "UPDATE videos SET auto_hsp=?,auto_hsp_version=? WHERE id=?",
+                    (blob, int(cfg.hsp.generated_version), video_id),
+                )
+                rebuilt = True
+                updated = db.get(video_id) or updated or video
+                if bool(getattr(cfg.hsp, "write_auto_sidecars", False)):
+                    try:
+                        _write_auto_sidecar_for_video(db, cfg, updated, replace=False)
+                        sidecar_written = True
+                    except (SidecarConflict, SidecarError):
+                        pass
+        live.publish(
+            "library", reason=reason, video_id=video_id,
+            rebuilt=rebuilt, deferred=active,
+        )
+        return {
+            "rebuilt": rebuilt,
+            "deferred_until_close": active,
+            "sidecar_written": sidecar_written,
+        }
+
     @app.patch("/api/videos/{video_id}/hsp-diagnostic")
     async def set_hsp_diagnostic(video_id: str, request: Request):
         """Select Image controls to neutralize only in the served Auto HSP."""
@@ -3409,63 +3497,83 @@ def create_app(cfg) -> FastAPI:
 
     @app.patch("/api/videos/{video_id}/hsp-policy")
     async def set_video_hsp_policy(video_id: str, request: Request):
-        """Persist Inherit / Force On / Force Off Auto-HSP controls."""
+        """Persist per-video Image HSP policy while preserving native policy."""
         video = db.get(video_id)
         if not video:
             raise HTTPException(404, "Video not found")
         body = await request_json(request)
+        current_raw = video.get("hsp_policy_override") or {}
+        native_overrides = normalize_native_policy_overrides(current_raw)
         if bool(body.get("reset")):
-            overrides: dict[str, str] = {}
+            image_overrides: dict[str, str] = {}
         else:
             raw = body.get("overrides", {})
             if not isinstance(raw, dict):
                 raise HTTPException(422, "overrides must be an object")
             unknown = sorted(set(str(key) for key in raw) - set(AUTO_IMAGE_CONTROLS))
             if unknown:
-                raise HTTPException(422, f"Unknown Auto-HSP control(s): {', '.join(unknown)}")
+                raise HTTPException(422, f"Unknown Auto-HSP Image control(s): {', '.join(unknown)}")
             invalid = [
                 str(key) for key, value in raw.items()
                 if str(value or "inherit").lower() not in {"inherit", "on", "off"}
             ]
             if invalid:
                 raise HTTPException(422, "Policy values must be inherit, on, or off")
-            overrides = normalize_policy_overrides(raw)
+            image_overrides = normalize_policy_overrides(raw)
 
-        db.exec(
-            "UPDATE videos SET hsp_policy_override_json=? WHERE id=?",
-            (json.dumps(overrides) if overrides else None, video_id),
-        )
-        active = _video_is_active(app, video_id)
-        rebuilt = False
-        sidecar_written = False
-        if active:
-            app.state.pending_hsp_rebuild.add(video_id)
-        else:
-            updated = db.get(video_id)
-            blob = _rebuild_auto_hsp(updated or video, cfg)
-            if blob is not None:
-                db.exec(
-                    "UPDATE videos SET auto_hsp=?,auto_hsp_version=? WHERE id=?",
-                    (blob, int(cfg.hsp.generated_version), video_id),
-                )
-                rebuilt = True
-                updated = db.get(video_id) or updated or video
-                if bool(getattr(cfg.hsp, "write_auto_sidecars", False)):
-                    try:
-                        _write_auto_sidecar_for_video(db, cfg, updated, replace=False)
-                        sidecar_written = True
-                    except (SidecarConflict, SidecarError):
-                        pass
-        live.publish(
-            "library", reason="video-hsp-policy", video_id=video_id,
-            rebuilt=rebuilt, deferred=active,
+        merged = {**image_overrides, **native_overrides}
+        update = persist_video_hsp_policy(
+            video_id, video, merged, reason="video-hsp-policy"
         )
         payload = await video_detail(video_id)
-        payload["policy_update"] = {
-            "rebuilt": rebuilt,
-            "deferred_until_close": active,
-            "sidecar_written": sidecar_written,
-        }
+        payload["policy_update"] = update
+        return payload
+
+    @app.patch("/api/videos/{video_id}/native-hsp-policy")
+    async def set_video_native_hsp_policy(video_id: str, request: Request):
+        """Persist per-video native-calibration policy and rebuild from evidence."""
+        video = db.get(video_id)
+        if not video:
+            raise HTTPException(404, "Video not found")
+        body = await request_json(request)
+        current_raw = video.get("hsp_policy_override") or {}
+        image_overrides = normalize_policy_overrides(current_raw)
+        native_overrides = normalize_native_policy_overrides(current_raw)
+
+        if bool(body.get("reset")):
+            native_overrides = {}
+        elif "control" in body:
+            control = str(body.get("control") or "").strip()
+            if control not in AUTO_NATIVE_CONTROLS:
+                raise HTTPException(422, f"Unknown native HSP control: {control}")
+            value = str(body.get("value") or "inherit").strip().lower()
+            if value not in {"inherit", "on", "off"}:
+                raise HTTPException(422, "Policy value must be inherit, on, or off")
+            if value == "inherit":
+                native_overrides.pop(control, None)
+            else:
+                native_overrides[control] = value
+        else:
+            raw = body.get("overrides", {})
+            if not isinstance(raw, dict):
+                raise HTTPException(422, "overrides must be an object")
+            unknown = sorted(set(str(key) for key in raw) - set(AUTO_NATIVE_CONTROLS))
+            if unknown:
+                raise HTTPException(422, f"Unknown native HSP control(s): {', '.join(unknown)}")
+            invalid = [
+                str(key) for key, value in raw.items()
+                if str(value or "inherit").lower() not in {"inherit", "on", "off"}
+            ]
+            if invalid:
+                raise HTTPException(422, "Policy values must be inherit, on, or off")
+            native_overrides = normalize_native_policy_overrides(raw)
+
+        merged = {**image_overrides, **native_overrides}
+        update = persist_video_hsp_policy(
+            video_id, video, merged, reason="video-native-hsp-policy"
+        )
+        payload = await video_detail(video_id)
+        payload["policy_update"] = update
         return payload
 
     @app.post("/api/videos/{video_id}/hsp-sidecar")
@@ -4578,6 +4686,23 @@ def create_app(cfg) -> FastAPI:
                     if last_image is not image_key else ""
                 )
             )
+        hsp_name = Path(str(video["path"])).with_suffix(".hsp").name
+        response = Response(
+            blob,
+            media_type="application/octet-stream",
+            headers={
+                "Cache-Control": cache_control,
+                "Pragma": "no-cache" if "no-store" in cache_control else "",
+                "ETag": f'"{revision}"',
+                "Content-Disposition": _inline_content_disposition(hsp_name, fallback="profile.hsp"),
+                "X-HereTune-Profile": kind,
+                "X-HereTune-Revision": revision,
+                "X-HereTune-Diagnostic": ",".join(_hsp_diagnostic_state(video)["disabled"]) or "baseline",
+                "X-HereTune-Revision-Fallback": "exact",
+            },
+        )
+        # Log only after Starlette has successfully constructed/encoded the response
+        # headers. This prevents a failed header build from masquerading as a served HSP.
         print(
             f"[HereTune HereSphere] HSP GET {_source_filename(video)} · "
             f"{kind} v{found_version} · rev {revision} · "
@@ -4585,22 +4710,7 @@ def create_app(cfg) -> FastAPI:
             f"{len(blob)} bytes · {hsp_detail}",
             flush=True,
         )
-        hsp_name = Path(str(video["path"])).with_suffix(".hsp").name
-        return Response(
-            blob,
-            media_type="application/octet-stream",
-            headers={
-                "Cache-Control": cache_control,
-                "Pragma": "no-cache" if "no-store" in cache_control else "",
-                "ETag": f'"{revision}"',
-                "Content-Disposition": f"inline; filename*=UTF-8''{quote(hsp_name, safe='')}",
-                "X-HereTune-Profile": kind,
-                "X-HereTune-Revision": revision,
-                "X-HereTune-Diagnostic": ",".join(_hsp_diagnostic_state(video)["disabled"]) or "baseline",
-                "X-HereTune-HSP-Filename": hsp_name,
-                "X-HereTune-Revision-Fallback": "exact",
-            },
-        )
+        return response
 
     @app.get("/preview/{video_id}/{variant}.jpg")
     async def preview_image(video_id: str, variant: str):

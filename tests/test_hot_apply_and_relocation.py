@@ -26,7 +26,7 @@ def configured_app(tmp_path: Path) -> tuple[Config, object]:
 
 
 def test_version():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
 
 
 def test_settings_hot_apply_after_save_but_restart_only_fields_stay_runtime_bound(tmp_path: Path):

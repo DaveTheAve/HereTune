@@ -8,7 +8,7 @@ from heretune import __version__
 
 
 def test_release_and_preview_revision():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     assert media.PREVIEW_RENDER_VERSION >= 3
     assert media.PREVIEW_CARD_WIDTH == 960
     assert media.PREVIEW_CARD_HEIGHT == 540

@@ -3273,15 +3273,9 @@ def analyze(
                 profile.av_sync_windows = int(sync["windows"])
                 profile.suggested_sync_drift_seconds_per_hour = float(sync["drift"])
                 profile.sync_drift_confidence = float(sync["drift_confidence"])
-                if (
-                    bool(getattr(cfg, "audio_sync_auto_apply", False))
-                    and profile.av_sync_confidence >= 0.68
-                    and abs(profile.suggested_audio_time_offset) <= 0.50
-                ):
-                    profile.audio_time_offset = profile.suggested_audio_time_offset
-                    if profile.sync_drift_confidence >= 0.72:
-                        profile.sync_drift_seconds_per_hour = profile.suggested_sync_drift_seconds_per_hour
-                    profile.audio_sync_auto_applied = True
+                # Keep the measured timing/drift evidence independent from HSP
+                # output policy. The HSP serializer decides later whether an
+                # Auto profile may apply these suggestions.
             except Exception as exc:
                 emit_diagnostic(
                     "audio-sync", f"{type(exc).__name__}: {exc}", kind="aux",

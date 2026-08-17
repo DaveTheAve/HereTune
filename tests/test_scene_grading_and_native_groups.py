@@ -357,32 +357,46 @@ def test_native_calibration_safe_defaults_and_opt_in_groups():
     correction = CorrectionProfile(
         audio_volume_multiplier=1.20,
         audio_loudness_confidence=0.9,
-        audio_time_offset=0.16,
-        sync_drift_seconds_per_hour=-0.08,
+        suggested_audio_time_offset=0.16,
+        av_sync_confidence=0.90,
+        suggested_sync_drift_seconds_per_hour=-0.08,
+        sync_drift_confidence=0.90,
     )
     cfg = Config()
     base = native_calibration_metadata({"metadata": metadata, "layout_override": {}}, metadata, cfg, correction)
+    # Preserve v0.13.0 behavior: confidence-gated vertical stereo alignment and
+    # encoded-border crop remain enabled by default; newly exposed native
+    # calibration outputs stay opt-in.
     assert base["stereo_alignment_applied"] is True
-    assert base["alignment_rotation"][0] == pytest.approx(0.42)
     assert base["auto_crop_applied"] is True
-    assert base["zoom"] == pytest.approx((1.14, 1.10))
     assert base["audio_volume_applied"] is True
     assert base["audio_volume_multiplier"] == pytest.approx(1.20)
-    # Riskier geometry/timing groups remain diagnostic by default.
     assert base["stereo_roll_applied"] is False
     assert base["stereo_scale_applied"] is False
     assert base["stitch_applied"] is False
     assert base["horizon_leveling_applied"] is False
     assert base["autofocus_applied"] is False
     assert base["audio_sync_applied"] is False
+    assert base["native_calibration_output_policy"]["stereo_disparity"] is True
+    assert base["native_calibration_output_policy"]["crop"] is True
+    assert all(
+        value is False
+        for name, value in base["native_calibration_output_policy"].items()
+        if name not in {"stereo_disparity", "crop"}
+    )
 
-    cfg.analysis.stereo_roll_auto_apply = True
-    cfg.analysis.stereo_scale_auto_apply = True
-    cfg.analysis.stitch_auto_apply = True
-    cfg.analysis.horizon_auto_apply = True
-    cfg.analysis.autofocus_auto_apply = True
-    cfg.analysis.audio_sync_auto_apply = True
+    cfg.hsp.auto_stereo_roll = True
+    cfg.hsp.auto_eye_scale_shear = True
+    cfg.hsp.auto_stitch_vectors = True
+    cfg.hsp.auto_crop = True
+    cfg.hsp.auto_horizon = True
+    cfg.hsp.auto_autofocus = True
+    cfg.hsp.auto_audio_sync = True
     applied = native_calibration_metadata({"metadata": metadata, "layout_override": {}}, metadata, cfg, correction)
+    assert applied["stereo_alignment_applied"] is True
+    assert applied["alignment_rotation"][0] == pytest.approx(0.42)
+    assert applied["auto_crop_applied"] is True
+    assert applied["zoom"] == pytest.approx((1.14, 1.10))
     assert applied["stereo_roll_applied"] is True
     assert applied["stitch_applied"] is True
     assert applied["horizon_leveling_applied"] is True
@@ -455,7 +469,7 @@ def test_config_ui_comparator_responsive_table_and_drag_direction():
     cfg = Config()
     public = public_config(cfg)
     for key in (
-        "per_channel_color", "scene_grading", "auto_crop", "horizon_leveling",
+        "per_channel_color", "scene_grading", "horizon_leveling",
         "stereo_roll_correction", "stereo_scale_correction", "stitch_correction",
         "autofocus_tuning", "audio_correction", "loudness_normalization",
         "audio_sync_analysis",
@@ -474,8 +488,10 @@ def test_config_ui_comparator_responsive_table_and_drag_direction():
 
     assert 'name="analysis.scene_max_keyframes" type="number" min="0"' in html
     assert 'name="analysis.per_channel_color"' in html
-    assert 'name="analysis.stitch_auto_apply"' in html
-    assert 'name="analysis.audio_sync_auto_apply"' in html
+    assert 'name="hsp.auto_stitch_vectors"' in html
+    assert 'name="hsp.auto_audio_sync"' in html
+    assert 'name="analysis.stitch_auto_apply"' not in html
+    assert 'name="analysis.audio_sync_auto_apply"' not in html
     assert "diagonal-compare" in js
     assert js.count('id="diagonalCompare"') == 1
     assert "compare-after-mask" in js

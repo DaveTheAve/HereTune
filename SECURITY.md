@@ -24,9 +24,11 @@ HTTP Basic authentication is **access control, not transport encryption**. On pl
 
 Source-file deletion remains disabled by default (`allow_file_delete = false`). Keep it that way unless you specifically need it and understand the consequences.
 
+Project repository: [https://github.com/DaveTheAve/HereTune](https://github.com/DaveTheAve/HereTune)
+
 ## Reporting a vulnerability
 
-Please do **not** post an exploitable vulnerability as a public GitHub issue. Use GitHub's private vulnerability reporting feature when available, or contact the project maintainer privately.
+Please do **not** post an exploitable vulnerability as a public GitHub issue. Use the repository's GitHub private vulnerability reporting feature at [https://github.com/DaveTheAve/HereTune](https://github.com/DaveTheAve/HereTune) when available, or contact the project maintainer privately.
 
 Include:
 

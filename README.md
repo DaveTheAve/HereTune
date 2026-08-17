@@ -8,6 +8,8 @@
 
 HereTune is an independent, community-built companion for **HereSphere VR Video Player**. It is **not affiliated with, endorsed by, sponsored by, or developed by HereSphere**. HereTune does not ship HereSphere binaries, PAK content, saved user data, or other proprietary HereSphere assets. You still need HereSphere. Shocking, I know.
 
+**Project home:** [https://github.com/DaveTheAve/HereTune](https://github.com/DaveTheAve/HereTune) · Issues, releases, source, and current documentation live there.
+
 ---
 
 ## Screenshots
@@ -47,7 +49,7 @@ HereTune currently provides:
 - sparse scene-by-scene HSP Image keyframes for sustained grading changes;
 - fade/black/title-like/duplicate sample rejection;
 - stereo packing/projection verification and conservative native calibration evidence;
-- vertical stereo alignment, roll/scale/stitch, crop/border, horizon, lens/FOV, and autofocus diagnostics;
+- vertical stereo disparity, eye roll/scale/shear, stitch vectors, crop/border, horizon, orientation, eye order, lens/FOV, and autofocus diagnostics;
 - audio loudness and A/V timing evidence;
 - HereSphere favorites and half-star ratings;
 - original-media byte-range streaming;
@@ -55,13 +57,13 @@ HereTune currently provides:
 - checkpoint-resumable analysis, run history, duplicate-media hints, Doctor diagnostics, and Library Health;
 - optional managed `.hsp` sidecars beside source videos, including retroactive background synchronization.
 
-Risky geometry/timing changes remain diagnostic or opt-in unless they have strong evidence behind them. HereTune is supposed to improve VR, not encourage nausea.
+Native geometry/timing evidence is measured independently from HSP output. **Stereo disparity/alignment and safe encoded-border crop preserve the v0.13.0 defaults and remain confidence-gated ON.** Newly exposed native calibration outputs remain OFF globally until explicitly enabled under HereSphere & HSP policy. In each video’s **VR verification & native calibration** drawer, every suggestion also has a persistent **Global / On / Off** per-video control for quick headset A/B testing without changing the rest of the library; the **Global** choice remains confidence-gated, while an explicit per-video **On** bypasses the confidence threshold for that title so you can audition a lower-confidence suggestion; hard validity/range/projection checks and advanced numeric layout overrides remain authoritative. HereTune is supposed to improve VR, not encourage nausea.
 
 ---
 
 ## Status
 
-**Current public release: v0.13.0 — first public release**
+**Current public release: v0.13.1**
 
 The public analysis revision is `offset-free-tone-1`.
 

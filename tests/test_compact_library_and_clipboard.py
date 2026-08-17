@@ -12,7 +12,7 @@ from heretune.server import _alpha_library_label, _compact_library_groups, creat
 
 
 def test_version_and_alpha_labels():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     assert [_alpha_library_label(i) for i in (0, 1, 25, 26, 27, 51, 52)] == ["A", "B", "Z", "AA", "AB", "AZ", "BA"]
     groups = [
         {"name": "Favorites", "list": ["favorite"]},

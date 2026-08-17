@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "heretune"
-version = "0.13.0"
+version = "0.13.1"
 description = "Automatic native image tuning companion for HereSphere VR Video Player"
 readme = "README.md"
 license = "PolyForm-Noncommercial-1.0.0"
@@ -27,8 +27,14 @@ dependencies = [
   "psutil>=6,<8",
 ]
 
+[project.urls]
+Homepage = "https://github.com/DaveTheAve/HereTune"
+Repository = "https://github.com/DaveTheAve/HereTune"
+Issues = "https://github.com/DaveTheAve/HereTune/issues"
+Documentation = "https://github.com/DaveTheAve/HereTune#readme"
+
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "httpx>=0.28,<1"]
+dev = ["pytest>=8,<10", "httpx>=0.28,<1"]
 
 [project.scripts]
 heretune = "heretune.cli:main"

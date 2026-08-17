@@ -1,5 +1,7 @@
 # HereSphere Web API — Quick Developer Reference
 
+HereTune project: [https://github.com/DaveTheAve/HereTune](https://github.com/DaveTheAve/HereTune)
+
 > **Unofficial community reference** · `HereSphere-JSON-Version: 1` · Updated 2026-08-16  
 > For complete schemas, version history, HSP v7 binary serialization, passthrough/chroma-key details, and edge cases, see [`HERESPHERE_API_REFERENCE.md`](HERESPHERE_API_REFERENCE.md).
 

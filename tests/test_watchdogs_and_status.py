@@ -19,7 +19,7 @@ from heretune.server import _status_payload
 
 def test_release_version_and_watchdog_defaults():
     cfg = Config()
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     assert cfg.analysis.analysis_width == 960
     assert cfg.analysis.scene_probe_width == 480
     assert cfg.analysis.ffmpeg_sample_timeout_seconds == 20.0

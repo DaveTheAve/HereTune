@@ -13,7 +13,7 @@ def test_version_and_favicon_assets(tmp_path: Path):
     cfg = Config(config_path=tmp_path / "config.toml")
     cfg.paths.data_dir = str(tmp_path / "data")
     app = create_app(cfg)
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     with TestClient(app) as client:
         ico = client.get("/favicon.ico")
         assert ico.status_code == 200

@@ -1,5 +1,7 @@
 # HereTune Configuration
 
+Project repository: [https://github.com/DaveTheAve/HereTune](https://github.com/DaveTheAve/HereTune)
+
 HereTune can be configured through the dashboard **Settings** dialog or by editing `config.toml`. The repository ships only `config.example.toml`; the installer creates your real `config.toml` locally.
 
 Settings saved from the UI are validated and written atomically. Most settings hot-apply immediately. The dashboard tells you when a change requires restart.
@@ -169,32 +171,24 @@ These limits prevent a broken/random NAS seek from leaving an `ffmpeg.exe` stuck
 
 ## VR verification and native calibration
 
-The public defaults favor evidence first and automatic geometry only where confidence/scope is conservative:
+Analysis and HSP output are intentionally separate. The Analysis settings below decide what HereTune measures and stores; the HSP switches later in this document decide which automatic native-calibration suggestions may reach HereSphere.
 
 ```toml
 vr_verification = true
 vr_verification_frames = 6
 orientation_verification = true
-orientation_auto_apply = false
-eye_swap_auto_apply = false
 stereo_alignment = true
-stereo_alignment_auto_apply = true
 stereo_roll_correction = true
-stereo_roll_auto_apply = false
 stereo_scale_correction = true
-stereo_scale_auto_apply = false
 stitch_correction = true
-stitch_auto_apply = false
-auto_crop = true
+auto_crop_min_confidence = 0.82
+auto_crop_max_zoom = 1.32
 horizon_leveling = true
-horizon_auto_apply = false
 autofocus_tuning = true
-autofocus_auto_apply = false
 lens_verification = true
-lens_fov_auto_apply = false
 ```
 
-The remaining confidence/range settings in `config.example.toml` bound these systems. Do not enable aggressive auto-application merely because a field exists in HSP v7.
+These controls keep measuring stereo disparity, eye scale/shear, stitch suggestions, persistent borders, horizon, orientation, lens/FOV, and autofocus evidence even when automatic HSP application is disabled. The confidence/range settings in `config.example.toml` bound those measurements.
 
 ## Audio and sync
 
@@ -202,12 +196,11 @@ The remaining confidence/range settings in `config.example.toml` bound these sys
 audio_correction = true
 loudness_normalization = true
 audio_sync_analysis = true
-audio_sync_auto_apply = false
 target_audio_mean_db = -20.0
 max_audio_gain = 1.35
 ```
 
-Loudness normalization is bounded. A/V offset/drift stays diagnostic unless explicitly enabled.
+Loudness normalization is bounded. A/V offset/drift remains measured evidence until `hsp.auto_audio_sync` is explicitly enabled.
 
 ## HSP output policy
 
@@ -222,16 +215,35 @@ auto_global_offset = false
 auto_shadows = false
 auto_midtones = true
 auto_highlights = true
+
+# Native calibration output: v0.13.0 defaults preserved
+# Stereo disparity and safe encoded-border crop are confidence-gated ON.
+auto_stereo_disparity = true
+auto_stereo_roll = false
+auto_eye_scale_shear = false
+auto_stitch_vectors = false
+auto_crop = true
+auto_horizon = false
+auto_orientation_180 = false
+auto_eye_swap = false
+auto_lens_fov = false
+auto_autofocus = false
+auto_audio_sync = false
 ```
 
-The full set of `auto_*` switches is in `config.example.toml` and Settings.
+The full set of image and native-calibration `auto_*` switches is in `config.example.toml` and Settings.
 
 Important semantics:
 
 - **Analysis evidence and HSP output policy are separate.** Turning a control off does not discard its saved measurement.
 - Global Offset is special: it never participates in the analyzer/tone solver. Its optional Force On value is output-only and tightly bounded.
 - Shadows is measured but disabled in Auto by default.
-- Per-video policy supports **Inherit global / Force On / Force Off** and can rebuild HSPs without decoding the source again.
+- Stereo disparity/alignment and safe encoded-border crop preserve their v0.13.0 confidence-gated defaults. Newly exposed native geometry/player-calibration outputs are OFF by default. Changing one rebuilds existing Auto HSPs from saved evidence; it does not re-analyze the source video.
+- Every native-calibration suggestion also has a persistent per-video **Global / On / Off** control in the video drawer. **On** explicitly requests that suggestion for the selected video and bypasses its confidence threshold; **Off** suppresses it only for that video; **Global** follows Settings and keeps the normal confidence gate. These overrides rebuild the Auto HSP from saved evidence without re-analysis.
+- Per-video **On** bypasses only the confidence threshold. Hard validity checks still remain: usable measurements must exist, values must be finite/range-safe, projection/layout constraints must be compatible, and explicit/manual metadata overrides remain authoritative.
+- Explicit per-video numeric layout/vector overrides remain authoritative over both global and per-video automatic native-calibration policy.
+- Older `analysis.*_auto_apply` / `analysis.auto_crop` settings have been retired; automatic application policy now lives under `[hsp]` plus the per-video HSP policy stored by the drawer. Saving Settings rewrites `config.toml` without those retired keys.
+- Per-video **Image** policy continues to support **Inherit global / Force On / Force Off** independently from the native-calibration Global / On / Off controls.
 
 ### HSP write-back
 

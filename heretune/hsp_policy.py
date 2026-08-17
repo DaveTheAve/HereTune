@@ -9,7 +9,7 @@ from typing import Any
 # These switches control what Auto is allowed to serialize. Analysis evidence is
 # intentionally retained even when a control is globally disabled, so changing
 # policy or applying a per-video override never requires another source decode.
-AUTO_HSP_POLICY_VERSION = 2
+AUTO_HSP_POLICY_VERSION = 3
 AUTO_IMAGE_CONTROLS: "OrderedDict[str, dict[str, Any]]" = OrderedDict([
     ("sharpen", {"label": "Sharpen", "neutral": 2.0, "default": True}),
     ("exposure", {"label": "Exposure", "neutral": 0.0, "default": True}),
@@ -37,6 +37,26 @@ AUTO_IMAGE_CONTROLS: "OrderedDict[str, dict[str, Any]]" = OrderedDict([
     ("scene_keyframes", {"label": "Scene keyframes", "neutral": None, "default": True}),
 ])
 
+# Native geometry/player calibration output controls are deliberately separate
+# from analysis evidence. They support the same Inherit / Force On / Force Off
+# per-video policy as Image controls. Preserve the public v0.13.0 defaults for
+# confidence-gated vertical stereo alignment and encoded-border crop; newly
+# exposed native-calibration outputs remain opt-in. Explicit numeric layout
+# overrides still win over automatic policy.
+AUTO_NATIVE_CONTROLS: "OrderedDict[str, dict[str, Any]]" = OrderedDict([
+    ("stereo_disparity", {"label": "Stereo disparity", "default": True}),
+    ("stereo_roll", {"label": "Stereo roll", "default": False}),
+    ("eye_scale_shear", {"label": "Eye scale / shear", "default": False}),
+    ("stitch_vectors", {"label": "Stitch vectors", "default": False}),
+    ("crop", {"label": "Native border crop", "default": True}),
+    ("horizon", {"label": "Horizon leveling", "default": False}),
+    ("orientation_180", {"label": "180° orientation correction", "default": False}),
+    ("eye_swap", {"label": "Eye swap", "default": False}),
+    ("lens_fov", {"label": "Generic lens/FOV suggestion", "default": False}),
+    ("autofocus", {"label": "Autofocus range", "default": False}),
+    ("audio_sync", {"label": "Audio timing / drift", "default": False}),
+])
+
 _OVERRIDE_VALUES = {"inherit", "on", "off"}
 
 
@@ -46,6 +66,59 @@ def _cfg_enabled(cfg, control: str) -> bool:
     if hsp is None:
         return bool(spec["default"])
     return bool(getattr(hsp, f"auto_{control}", spec["default"]))
+
+
+def _native_cfg_enabled(cfg, control: str) -> bool:
+    hsp = getattr(cfg, "hsp", None)
+    spec = AUTO_NATIVE_CONTROLS[control]
+    if hsp is None:
+        return bool(spec["default"])
+    return bool(getattr(hsp, f"auto_{control}", spec["default"]))
+
+
+def global_auto_native_policy(cfg=None) -> dict[str, bool]:
+    return {name: _native_cfg_enabled(cfg, name) for name in AUTO_NATIVE_CONTROLS}
+
+
+def normalize_native_policy_overrides(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    result: dict[str, str] = {}
+    for key, raw in value.items():
+        name = str(key or "").strip()
+        state = str(raw or "inherit").strip().lower()
+        if name not in AUTO_NATIVE_CONTROLS or state not in _OVERRIDE_VALUES:
+            continue
+        if state != "inherit":
+            result[name] = state
+    return result
+
+
+def effective_auto_native_policy(cfg=None, overrides: object = None) -> dict[str, bool]:
+    result = global_auto_native_policy(cfg)
+    for name, state in normalize_native_policy_overrides(overrides).items():
+        result[name] = state == "on"
+    return result
+
+
+def native_policy_payload(cfg=None, overrides: object = None) -> dict[str, object]:
+    normalized = normalize_native_policy_overrides(overrides)
+    effective = effective_auto_native_policy(cfg, normalized)
+    return {
+        "version": AUTO_HSP_POLICY_VERSION,
+        "controls": [
+            {
+                "name": name,
+                "label": str(spec["label"]),
+                "global": bool(_native_cfg_enabled(cfg, name)),
+                "override": normalized.get(name, "inherit"),
+                "effective": bool(effective[name]),
+                # Backward-compatible alias for the first v0.13.1 drawer.
+                "enabled": bool(effective[name]),
+            }
+            for name, spec in AUTO_NATIVE_CONTROLS.items()
+        ],
+    }
 
 
 def normalize_policy_overrides(value: object) -> dict[str, str]:
@@ -95,7 +168,8 @@ def policy_payload(cfg=None, overrides: object = None) -> dict[str, object]:
 def policy_signature(cfg=None) -> str:
     payload = {
         "version": AUTO_HSP_POLICY_VERSION,
-        "controls": global_auto_image_policy(cfg),
+        "image_controls": global_auto_image_policy(cfg),
+        "native_controls": global_auto_native_policy(cfg),
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")

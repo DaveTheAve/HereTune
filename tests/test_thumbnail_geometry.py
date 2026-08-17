@@ -4,7 +4,7 @@ from heretune import __version__
 
 
 def test_version_and_thumbnail_geometry():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     root = Path(__file__).resolve().parents[1]
     css = (root / "heretune/static/styles.css").read_text(encoding="utf-8")
     assert ".video-thumb { display:block; width:100%; height:100%;" in css

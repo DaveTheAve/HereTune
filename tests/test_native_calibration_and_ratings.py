@@ -193,6 +193,11 @@ def test_multiframe_stereo_alignment_is_vertical_only_and_capped():
 
     cfg = Config()
     row = {"metadata": {"stereo_alignment": alignment}, "layout_override": {}}
+    diagnostic = native_calibration_metadata(row, row["metadata"], cfg)
+    # v0.13.1 preserves v0.13.0's confidence-gated stereo alignment default.
+    assert diagnostic["stereo_alignment_applied"] is True
+    assert diagnostic["native_calibration_output_policy"]["stereo_disparity"] is True
+
     native = native_calibration_metadata(row, row["metadata"], cfg)
     assert native["stereo_alignment_applied"] is True
     assert native["alignment_rotation"][1:] == (0.0, 0.0)
@@ -253,7 +258,6 @@ def test_config_and_ui_expose_new_grade_calibration_and_half_stars():
         "sharpening",
         "temperature_tint",
         "vr_verification",
-        "eye_swap_auto_apply",
         "stereo_alignment",
         "lens_verification",
     ):
@@ -267,12 +271,16 @@ def test_config_and_ui_expose_new_grade_calibration_and_half_stars():
     example = (root / "config.example.toml").read_text(encoding="utf-8")
     assert 'value="4.5plus"' in html
     assert 'name="analysis.advanced_tone"' in html
-    assert 'name="analysis.stereo_alignment_auto_apply"' in html
-    assert 'name="analysis.lens_fov_auto_apply"' in html
+    assert 'name="hsp.auto_stereo_disparity"' in html
+    assert 'name="hsp.auto_lens_fov"' in html
+    assert 'name="analysis.stereo_alignment_auto_apply"' not in html
+    assert 'name="analysis.lens_fov_auto_apply"' not in html
     assert 'data-star-rating="${half.toFixed(1)}"' in js
     assert "Native image grade" in js
     assert "VR verification & native calibration" in js
     assert ".rating-half-left" in css
     assert ".calibration-summary-grid" in css
     assert "temperature_tint_strength = 0.45" in example
-    assert "stereo_alignment_auto_apply = true" in example
+    assert "auto_stereo_disparity = true" in example
+    assert "auto_lens_fov = false" in example
+    assert "stereo_alignment_auto_apply" not in example

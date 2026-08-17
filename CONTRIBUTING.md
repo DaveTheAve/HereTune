@@ -2,6 +2,8 @@
 
 Thanks for helping the tiny unpaid colorist become a slightly more competent tiny unpaid colorist.
 
+Repository: [https://github.com/DaveTheAve/HereTune](https://github.com/DaveTheAve/HereTune)
+
 ## Before opening a pull request
 
 1. Read `AGENTS.md` for project invariants and the "please do not invent an HSP field because the bytes looked lonely" rules.

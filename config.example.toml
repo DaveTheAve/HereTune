@@ -123,47 +123,36 @@ ffmpeg_sample_timeout_seconds = 20.0
 ffmpeg_aux_timeout_seconds = 45.0
 ffprobe_timeout_seconds = 30.0
 
-# Multi-frame VR verification and conservative HSP geometry correction.
+# Multi-frame VR verification. These settings measure evidence only; automatic
+# native-calibration HSP output is controlled in [hsp] and defaults OFF.
 vr_verification = true
 vr_verification_frames = 6
 orientation_verification = true
-orientation_auto_apply = false
-eye_swap_auto_apply = false
 stereo_alignment = true
-stereo_alignment_auto_apply = true
 stereo_alignment_min_confidence = 0.72
 stereo_alignment_max_degrees = 0.75
 stereo_roll_correction = true
-stereo_roll_auto_apply = false
 stereo_scale_correction = true
-stereo_scale_auto_apply = false
 stitch_correction = true
-stitch_auto_apply = false
 max_stitch_shift = 0.025
 max_stitch_scale_delta = 0.030
 
-# Persistent encoded-border crop and camera horizon evidence. Crop is enabled
-# only for safe projections/high confidence; horizon application is opt-in.
-auto_crop = true
+# Persistent encoded-border and camera-horizon evidence thresholds.
 auto_crop_min_confidence = 0.82
 auto_crop_max_zoom = 1.32
 horizon_leveling = true
-horizon_auto_apply = false
 horizon_min_confidence = 0.78
 horizon_max_degrees = 3.0
 
 autofocus_tuning = true
-autofocus_auto_apply = false
 lens_verification = true
-lens_fov_auto_apply = false
 lens_fov_min_confidence = 0.80
 
-# Native HSP Audio/Sync controls. Bounded loudness normalization may apply;
-# timing and drift remain diagnostic unless explicitly enabled.
+# Audio evidence. Bounded loudness normalization may apply; timing/drift
+# suggestions remain evidence until enabled in [hsp].
 audio_correction = true
 loudness_normalization = true
 audio_sync_analysis = true
-audio_sync_auto_apply = false
 target_audio_mean_db = -20.0
 max_audio_gain = 1.35
 
@@ -201,6 +190,23 @@ auto_shadows = false
 auto_midtones = true
 auto_highlights = true
 auto_scene_keyframes = true
+
+# Native calibration output policy. Preserve the public v0.13.0 confidence-gated
+# defaults for vertical stereo alignment and safe encoded-border crop. Newly
+# exposed geometry/player corrections remain OFF until explicitly enabled.
+# Analysis still measures the corresponding evidence, and explicit per-video
+# layout overrides remain authoritative.
+auto_stereo_disparity = true
+auto_stereo_roll = false
+auto_eye_scale_shear = false
+auto_stitch_vectors = false
+auto_crop = true
+auto_horizon = false
+auto_orientation_180 = false
+auto_eye_swap = false
+auto_lens_fov = false
+auto_autofocus = false
+auto_audio_sync = false
 
 # Keep HereTune's current Auto HSP atomically beside each source as <stem>.hsp.
 # This is useful for direct SMB/local playback and backup. Do not enable HereSphere's

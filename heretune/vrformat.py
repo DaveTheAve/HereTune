@@ -1037,13 +1037,9 @@ def detect_visual_layout_sequence(
     filename_metadata: dict[str, object] | None = None,
     *,
     orientation_verification: bool = True,
-    orientation_auto_apply: bool = False,
     stereo_alignment: bool = True,
     stereo_alignment_max_degrees: float = 0.75,
     lens_verification: bool = True,
-    auto_apply_eye_swap: bool = False,
-    lens_fov_auto_apply: bool = False,
-    lens_fov_min_confidence: float = 0.80,
     horizon_leveling: bool = True,
 ) -> dict[str, object]:
     """Aggregate several frames into one conservative VR calibration result."""
@@ -1138,9 +1134,9 @@ def detect_visual_layout_sequence(
             float(resolved.get("fov") or 180.0),
             stereo_alignment_max_degrees,
         )
-        if auto_apply_eye_swap and not explicit_stereo and float(alignment.get("eye_swap_confidence") or 0.0) >= 0.86:
-            resolved["isEyeSwapped"] = not bool(resolved.get("isEyeSwapped"))
-            alignment["eye_swap_auto_applied"] = True
+        # Detection is evidence-only. HSP output policy decides whether an
+        # eye-order suggestion is ever serialized.
+        alignment["eye_swap_auto_applied"] = False
 
     orientation: dict[str, object] = {"confidence": 0.0, "reason": "disabled"}
     if orientation_verification:
@@ -1149,16 +1145,9 @@ def detect_visual_layout_sequence(
             str(resolved.get("stereo") or "mono"),
             bool(resolved.get("isEyeSwapped")),
         )
-        if (
-            orientation_auto_apply
-            and bool(orientation.get("rotate_180_suspected"))
-            and float(orientation.get("confidence") or 0.0) >= 0.82
-        ):
-            resolved["flip_left_right"] = True
-            resolved["flip_up_down"] = True
-            orientation["auto_applied"] = True
-        else:
-            orientation["auto_applied"] = False
+        # Detection is evidence-only. Orientation output is gated later by
+        # the native-calibration HSP policy.
+        orientation["auto_applied"] = False
 
     horizon: dict[str, object] = {"confidence": 0.0, "reason": "disabled"}
     if horizon_leveling:
@@ -1191,15 +1180,8 @@ def detect_visual_layout_sequence(
             "mkx200" in str(base.get("lens") or "").casefold()
             or (str(base.get("lens") or "").casefold() == "linear" and existing_fov in {135.0, 180.0, 190.0})
         )
-        if (
-            lens_fov_auto_apply
-            and not explicit_projection
-            and suggested_fov > 0
-            and fov_conf >= float(lens_fov_min_confidence)
-        ):
-            resolved["fov"] = suggested_fov
-            lens_detail["fov_auto_applied"] = True
-        elif existing_fov > 0 and suggested_fov > 0 and abs(existing_fov - suggested_fov) >= 25 and fov_conf >= 0.62:
+        lens_detail["fov_auto_applied"] = False
+        if existing_fov > 0 and suggested_fov > 0 and abs(existing_fov - suggested_fov) >= 25 and fov_conf >= 0.62:
             conflicts.append(
                 f"advertised FOV {existing_fov:g}° differs from the coarse lens-boundary family hint {suggested_fov:g}°"
             )
@@ -1245,7 +1227,6 @@ def detect_visual_layout(
     return detect_visual_layout_sequence(
         [frame_u8], name, width, height, filename_metadata,
         orientation_verification=False,
-        orientation_auto_apply=False,
         stereo_alignment=False,
         lens_verification=True,
         horizon_leveling=False,

@@ -1,5 +1,7 @@
 # HereSphere Web API & HSP Format — Community Reference
 
+HereTune project: [https://github.com/DaveTheAve/HereTune](https://github.com/DaveTheAve/HereTune)
+
 > **Status:** Unofficial community documentation  
 > **Last updated:** 2026-08-16  
 > **Web API protocol:** `HereSphere-JSON-Version: 1`  

@@ -5,7 +5,7 @@ from heretune.analyzer import ANALYSIS_VERSION
 
 
 def test_public_release_polish_version_and_engine_invariant():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     assert ANALYSIS_VERSION == "offset-free-tone-1"
 
 

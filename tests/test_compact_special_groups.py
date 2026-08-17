@@ -3,7 +3,7 @@ from heretune.server import _compact_library_groups
 
 
 def test_special_compact_groups_do_not_consume_folder_letters():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     source = [
         {"name": "Favorites", "list": ["f"]},
         {"name": "All Movies", "list": ["a"]},

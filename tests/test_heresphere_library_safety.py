@@ -42,7 +42,7 @@ def _insert_video(db, source: Path, root: Path, *, status: str, with_hsp: bool) 
 
 
 def test_version_and_ready_only_default():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     cfg = Config()
     assert cfg.server.heresphere_ready_only is True
     assert "status='ready'" in _heresphere_library_where(cfg)

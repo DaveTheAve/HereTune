@@ -6,7 +6,8 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLIC_VERSION = "0.13.0"
+PUBLIC_VERSION = "0.13.1"
+PUBLIC_RELEASE_HISTORY = ["0.13.1", "0.13.0"]
 
 FORBIDDEN_TRACKED_NAMES = {
     "config.toml",
@@ -87,8 +88,8 @@ def _version_checks() -> None:
 
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     release_headings = re.findall(r"^#{1,3}\s+v(\d+\.\d+\.\d+)\b", changelog, re.M | re.I)
-    if release_headings != [PUBLIC_VERSION]:
-        fail(f"CHANGELOG must contain exactly one public release heading for v{PUBLIC_VERSION}; found {release_headings}")
+    if release_headings != PUBLIC_RELEASE_HISTORY:
+        fail(f"CHANGELOG public release history must be {PUBLIC_RELEASE_HISTORY}; found {release_headings}")
 
 
 def _markdown_checks() -> None:
@@ -160,7 +161,7 @@ def main() -> None:
     if re.search(r'^root\s*=', example, re.M):
         fail("public config must not expose the removed single-root key")
 
-    # Private-development HereTune version history belongs nowhere in first-public
+    # Private-development HereTune version history belongs nowhere in public
     # user/runtime surfaces. Preserved HereSphere reference docs are excluded here
     # because their own upstream release numbers are part of the technical record.
     history_targets = [
@@ -172,7 +173,7 @@ def main() -> None:
     for path in history_targets:
         text = path.read_text(encoding="utf-8", errors="ignore")
         matches = sorted(set(private_version.findall(text)))
-        allowed = {f"v{PUBLIC_VERSION}"}
+        allowed = {f"v{version}" for version in PUBLIC_RELEASE_HISTORY}
         unexpected = [item for item in matches if item not in allowed]
         if unexpected:
             fail(f"non-public version history remains in {path.relative_to(ROOT)}: {unexpected}")

@@ -1,5 +1,7 @@
 # HereTune Troubleshooting
 
+Project repository: [https://github.com/DaveTheAve/HereTune](https://github.com/DaveTheAve/HereTune)
+
 Start with **Run doctor** in the dashboard. It checks Python, FFmpeg/FFprobe, OpenCV, CUDA/NVDEC, HSP serialization, library reachability, database integrity, cache/storage, and other runtime prerequisites.
 
 ## Unsupported database schema

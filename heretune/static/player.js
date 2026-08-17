@@ -1,4 +1,4 @@
-const PLAYER_BUILD = '0.13.0';
+const PLAYER_BUILD = '0.13.1';
 const $ = (q) => document.querySelector(q);
 const $$ = (q) => [...document.querySelectorAll(q)];
 

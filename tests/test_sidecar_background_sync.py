@@ -75,7 +75,7 @@ def _wait_for_sync(client: TestClient, timeout: float = 5.0) -> dict[str, object
 
 
 def test_version_and_engine_revision():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     assert ANALYSIS_VERSION == "offset-free-tone-1"
 
 

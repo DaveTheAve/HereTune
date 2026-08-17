@@ -8,7 +8,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/favicon-180.png">
-  <link rel="stylesheet" href="/static/styles.css?v=0.13.0">
+  <link rel="stylesheet" href="/static/styles.css?v=0.13.1">
 </head>
 <body>
   <div class="ambient ambient-one"></div>
@@ -113,7 +113,7 @@
           </div>
           <div class="table-actions">
 
-            <button class="button small ghost table-action-button" id="selectAllButton" title="Select every video matching the current search and filters">Select all</button>
+            <button class="button small ghost table-action-button" id="selectAllButton" title="Select every video on the current page">Select page</button>
             <button class="button small ghost filter-reset" id="resetFiltersButton" title="Clear search and restore default filters">Reset</button>
             <button class="button small ghost table-action-button" id="analyzeAllButton">Requeue errors</button>
             <div class="pagination-top" aria-label="Library pagination shortcut">
@@ -136,7 +136,7 @@
         </div>
       </div>
       <div class="selection-bar" id="selectionBar" hidden>
-        <div><strong id="selectionCount">0 selected</strong><span id="selectionScope">Current selection</span></div>
+        <div class="selection-summary"><strong id="selectionCount">0 selected</strong><span id="selectionScope">Current selection</span><button type="button" class="selection-all-pages" id="selectAllMatchingButton" hidden></button></div>
         <div class="selection-actions">
           <button class="button small primary" id="prioritizeSelectionButton">↑ Prioritize selection</button>
           <button class="button small ghost" id="clearSelectionButton">Clear selection</button>
@@ -163,6 +163,7 @@
           <button class="button small ghost page-button" id="pageFirstButton" aria-label="First page" title="First page">«</button>
           <button class="button small ghost page-button" id="pagePrevButton" aria-label="Previous page" title="Previous page">‹</button>
           <strong id="pageStatus">Page 1 of 1</strong>
+          <label class="page-jump-label"><span>Go to</span><input id="pageJumpInput" type="number" min="1" step="1" inputmode="numeric" aria-label="Jump to page"><button type="button" class="button small ghost page-jump-button" id="pageJumpButton">Go</button></label>
           <button class="button small ghost page-button" id="pageNextButton" aria-label="Next page" title="Next page">›</button>
           <button class="button small ghost page-button" id="pageLastButton" aria-label="Last page" title="Last page">»</button>
         </div>
@@ -180,6 +181,7 @@
       <p>Independent companion for HereSphere · No transcoding · No duplicate media · No NAS existential crisis.</p>
       <nav class="site-footer-actions" aria-label="HereTune footer">
         <span class="site-footer-version" id="footerVersion">v—</span>
+        <a href="https://github.com/DaveTheAve/HereTune" target="_blank" rel="noopener">GitHub</a>
         <a href="/docs" target="_blank" rel="noopener">API docs</a>
         <button type="button" id="footerDoctorButton">Doctor</button>
         <button type="button" id="footerSettingsButton">Settings</button>
@@ -195,10 +197,9 @@
     </section>
   </aside>
 
-  <dialog id="setupDialog" class="setup-dialog">
+  <dialog id="setupDialog" class="setup-dialog modal-dialog">
     <div class="setup-shell">
-      <span class="eyebrow">FIRST RUN</span>
-      <h2>Welcome to HereTune</h2>
+      <div class="modal-header setup-modal-header"><div class="modal-title-block"><span class="eyebrow">FIRST RUN</span><h2>Welcome to HereTune</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close setup">×</button></div>
       <p class="dialog-copy">Three minutes now saves forty-seven minutes later wondering why the server is enthusiastically indexing absolutely nothing.</p>
       <div class="setup-progress" aria-label="Setup progress"><i class="active"></i><i></i><i></i><i></i></div>
       <section class="setup-step active" data-setup-step="0">
@@ -233,50 +234,59 @@
     </div>
   </dialog>
 
-  <dialog id="tourDialog" class="tour-dialog">
+  <dialog id="tourDialog" class="tour-dialog modal-dialog">
     <div class="tour-card">
-      <span class="eyebrow">GUIDED TOUR</span>
-      <h2 id="tourTitle">Meet the dashboard</h2>
+      <div class="modal-header tour-modal-header"><div class="modal-title-block"><span class="eyebrow">GUIDED TOUR</span><h2 id="tourTitle">Meet the dashboard</h2></div><button type="button" class="modal-close" data-close-dialog aria-label="Close guided tour">×</button></div>
       <p id="tourCopy"></p>
       <div class="tour-count" id="tourCount"></div>
       <div class="tour-actions"><button type="button" class="button ghost" id="tourSkipButton">Skip</button><button type="button" class="button primary" id="tourNextButton">Next</button></div>
     </div>
   </dialog>
 
-  <dialog id="doctorDialog" class="health-dialog doctor-dialog">
-    <form method="dialog"><button class="drawer-close" value="close">×</button></form>
-    <div class="dialog-heading-row"><div><span class="eyebrow">DIAGNOSTICS</span><h2>HereTune doctor</h2><p class="dialog-copy">Runtime checks, library health, storage, database integrity, and safe maintenance in one place.</p></div></div>
+  <dialog id="doctorDialog" class="health-dialog doctor-dialog modal-dialog">
+    <div class="modal-header doctor-modal-header"><div class="modal-title-block"><span class="eyebrow">DIAGNOSTICS & HEALTH</span><h2>HereTune doctor</h2><p class="dialog-copy">Runtime checks, library health, storage, database integrity, and safe maintenance in one place.</p></div><button type="button" class="modal-close" data-close-dialog aria-label="Close Doctor">×</button></div>
     <div class="doctor-tabs" role="tablist" aria-label="Doctor sections">
-      <button type="button" class="active" data-doctor-tab="checks" role="tab" aria-selected="true">Diagnostics</button>
-      <button type="button" data-doctor-tab="health" role="tab" aria-selected="false">Library health</button>
+      <button type="button" class="active" data-doctor-tab="checks" role="tab" aria-selected="true"><span>✓</span> Diagnostics</button>
+      <button type="button" data-doctor-tab="health" role="tab" aria-selected="false"><span>♡</span> Library health</button>
     </div>
-    <section class="doctor-tab-panel" data-doctor-panel="checks"><div id="doctorResults" class="doctor-results"></div></section>
+    <section class="doctor-tab-panel" data-doctor-panel="checks"><div id="doctorOverview" class="doctor-overview"></div><div id="doctorResults" class="doctor-results"></div></section>
     <section class="doctor-tab-panel" data-doctor-panel="health" hidden>
       <div class="doctor-health-heading"><div><strong>Storage, database & maintenance</strong><small>Health snapshot plus safe maintenance tools. Maintenance waits until active analysis is idle.</small></div><button class="button ghost small" id="refreshHealthButton" type="button">Refresh</button></div>
       <div id="healthResults" class="health-results"><div class="empty-inline">Open Library health to load the snapshot.</div></div>
     </section>
   </dialog>
 
-  <dialog id="queueDialog" class="queue-dialog">
-    <form method="dialog"><button class="drawer-close" value="close">×</button></form>
-    <span class="eyebrow">PRIORITY QUEUE</span>
-    <h2>Analyze these next</h2>
-    <p class="dialog-copy">New priority requests append to the end of this list (FIFO). Drag promoted videos only when you deliberately want to reorder them. They run before the normal queue.</p>
+  <dialog id="queueDialog" class="queue-dialog modal-dialog">
+    <div class="modal-header queue-modal-header"><div class="modal-title-block"><span class="eyebrow">PRIORITY QUEUE</span><h2>Analyze these next</h2><p class="dialog-copy">New priority requests append to the end of this list (FIFO). Drag promoted videos only when you deliberately want to reorder them. They run before the normal queue.</p></div><button type="button" class="modal-close" data-close-dialog aria-label="Close priority queue">×</button></div>
     <div id="priorityQueueList" class="priority-queue-list"></div>
     <div class="queue-empty" id="priorityQueueEmpty" hidden>No promoted videos. The normal queue is in charge.</div>
   </dialog>
 
   
 
-  <dialog id="settingsDialog" class="settings-dialog">
-    <form method="dialog"><button class="drawer-close" value="close">×</button></form>
+  <dialog id="settingsDialog" class="settings-dialog modal-dialog">
     <div class="settings-heading">
-      <span class="eyebrow">CONFIGURATION</span>
-      <h2>HereTune settings</h2>
-      <p>Edit the real <code>config.toml</code> without spelunking through punctuation. Settings are grouped by what they affect, validated before save, and written atomically.</p>
-      <div class="settings-index"><a href="#settingsLibrary">Library</a><a href="#settingsAnalysis">Analysis</a><a href="#settingsImage">Image grade</a><a href="#settingsHsp">HereSphere</a><a href="#settingsRuntime">Runtime</a></div>
+      <div class="settings-heading-copy">
+        <span class="eyebrow">CONFIGURATION</span>
+        <h2>HereTune settings</h2>
+        <p>Edit the real <code>config.toml</code> without spelunking through punctuation. Settings are grouped by what they affect, validated before save, and written atomically.</p>
+      </div>
+      <div class="settings-heading-badges" aria-label="Settings behavior"><span>Atomic save</span><span>Hot-apply where safe</span></div>
+    </div>
+    <div class="settings-index" aria-label="Settings sections">
+      <div class="settings-index-links">
+        <a href="#settingsLibrary" data-settings-nav="settingsLibrary">Library</a>
+        <a href="#settingsAnalysis" data-settings-nav="settingsAnalysis">Compute</a>
+        <a href="#settingsImage" data-settings-nav="settingsImage">Image grade</a>
+        <a href="#settingsVr" data-settings-nav="settingsVr">VR calibration</a>
+        <a href="#settingsHsp" data-settings-nav="settingsHsp">HSP output</a>
+        <a href="#settingsRuntime" data-settings-nav="settingsRuntime">Runtime</a>
+      </div>
+      <label class="settings-search"><span>Find</span><input id="settingsSearch" type="search" autocomplete="off" placeholder="Search settings…" aria-label="Search settings"></label>
+      <button type="button" class="modal-close settings-close" data-close-dialog aria-label="Close settings">×</button>
     </div>
     <form id="settingsForm" class="settings-form">
+      <div class="settings-search-empty" id="settingsSearchEmpty" hidden>No settings matched that search. Your config remains blissfully untouched.</div>
       <section class="settings-section preset-section">
         <div class="settings-section-title"><span>★</span><div><h3>Quick analysis presets</h3><p>Start with a sensible profile, then customize anything below. Applying a preset changes the form only; nothing is written until you click Save settings.</p></div></div>
         <div class="preset-cards" id="settingsPresetCards"></div>
@@ -366,8 +376,8 @@
         </div>
       </section>
 
-      <section class="settings-section">
-        <div class="settings-section-title"><span>06</span><div><h3>VR framing & orientation</h3><p>Verify packing and projection across multiple frames, remove safe persistent borders through native Zoom/Pan, and measure camera roll without rewriting the source.</p></div></div>
+      <section class="settings-section" id="settingsVr">
+        <div class="settings-section-title"><span>06</span><div><h3>VR framing & orientation</h3><p>Measure packing, projection, persistent borders, eye order, and camera roll. Automatic HSP application is controlled separately in HereSphere & HSP policy.</p></div></div>
         <div class="settings-grid cols-3">
           <label class="field"><span>Verification frames</span><input name="analysis.vr_verification_frames" type="number" min="1" max="7" step="1"><small>Representative frames used for consensus.</small></label>
           <label class="field"><span>Crop confidence</span><input name="analysis.auto_crop_min_confidence" type="number" min="0.55" max="0.98" step="0.01"></label>
@@ -375,17 +385,13 @@
           <label class="field"><span>Horizon confidence</span><input name="analysis.horizon_min_confidence" type="number" min="0.5" max="0.98" step="0.01"></label>
           <label class="field"><span>Maximum horizon correction</span><input name="analysis.horizon_max_degrees" type="number" min="0" max="10" step="0.1"></label>
           <label class="toggle span-2"><input name="analysis.vr_verification" type="checkbox"><span><strong>Content-based VR verification</strong><small>Cross-check SBS/TB/mono, projection clues, active image bounds, and metadata conflicts across several frames.</small></span></label>
-          <label class="toggle"><input name="analysis.auto_crop" type="checkbox"><span><strong>Safe native border crop</strong><small>Apply bounded Zoom/Pan only for persistent symmetric borders and safe projections.</small></span></label>
           <label class="toggle"><input name="analysis.orientation_verification" type="checkbox"><span><strong>Orientation verification</strong><small>Detect likely upside-down/rotated footage.</small></span></label>
-          <label class="toggle"><input name="analysis.orientation_auto_apply" type="checkbox"><span><strong>Auto-apply 180° orientation</strong><small>Opt-in; artistic shots can confuse face-based evidence.</small></span></label>
-          <label class="toggle"><input name="analysis.eye_swap_auto_apply" type="checkbox"><span><strong>Auto-apply eye swap</strong><small>Opt-in; eye order remains diagnostic by default.</small></span></label>
           <label class="toggle"><input name="analysis.horizon_leveling" type="checkbox"><span><strong>Horizon/camera-roll analysis</strong><small>Measure a persistent small roll from stable horizontal scene lines.</small></span></label>
-          <label class="toggle"><input name="analysis.horizon_auto_apply" type="checkbox"><span><strong>Auto-level horizon</strong><small>Opt-in and confidence-gated through the HSP Orientation keyframe.</small></span></label>
         </div>
       </section>
 
       <section class="settings-section">
-        <div class="settings-section-title"><span>07</span><div><h3>Stereo, stitching & lens calibration</h3><p>Measure eye mismatch, roll, scale, shear, and known fisheye geometry. The risky corrections remain opt-in while vertical eye comfort stays tightly bounded.</p></div></div>
+        <div class="settings-section-title"><span>07</span><div><h3>Stereo, stitching & lens calibration</h3><p>Measure eye mismatch, roll, scale, shear, stitch geometry, and fisheye/FOV evidence. These measurements stay diagnostic until enabled in the HSP output policy.</p></div></div>
         <div class="settings-grid cols-3">
           <label class="field"><span>Alignment confidence</span><input name="analysis.stereo_alignment_min_confidence" type="number" min="0.5" max="0.98" step="0.01"></label>
           <label class="field"><span>Max vertical correction</span><input name="analysis.stereo_alignment_max_degrees" type="number" min="0" max="2" step="0.05"><small>Degrees; intentionally capped for comfort.</small></label>
@@ -393,29 +399,22 @@
           <label class="field"><span>Max stitch scale delta</span><input name="analysis.max_stitch_scale_delta" type="number" min="0" max="0.10" step="0.001"></label>
           <label class="field"><span>Lens/FOV confidence</span><input name="analysis.lens_fov_min_confidence" type="number" min="0.45" max="0.98" step="0.01"></label>
           <label class="toggle"><input name="analysis.stereo_alignment" type="checkbox"><span><strong>Stereo alignment analysis</strong><small>Measure vertical/horizontal disparity and relative roll.</small></span></label>
-          <label class="toggle"><input name="analysis.stereo_alignment_auto_apply" type="checkbox"><span><strong>Auto-correct vertical disparity</strong><small>Only stable vertical mismatch; horizontal disparity remains untouched depth.</small></span></label>
           <label class="toggle"><input name="analysis.stereo_roll_correction" type="checkbox"><span><strong>Stereo roll analysis</strong><small>Estimate a persistent relative rotation between eyes.</small></span></label>
-          <label class="toggle"><input name="analysis.stereo_roll_auto_apply" type="checkbox"><span><strong>Auto-correct stereo roll</strong><small>Experimental and OFF by default.</small></span></label>
           <label class="toggle"><input name="analysis.stereo_scale_correction" type="checkbox"><span><strong>Eye-scale analysis</strong><small>Detect one eye being slightly larger/smaller than the other.</small></span></label>
-          <label class="toggle"><input name="analysis.stereo_scale_auto_apply" type="checkbox"><span><strong>Auto-correct eye scale</strong><small>Experimental and tightly bounded.</small></span></label>
           <label class="toggle"><input name="analysis.stitch_correction" type="checkbox"><span><strong>Stitch geometry analysis</strong><small>Derive conservative Shift/Scale/Shear/Flare/Slant suggestions.</small></span></label>
-          <label class="toggle"><input name="analysis.stitch_auto_apply" type="checkbox"><span><strong>Auto-apply stitch correction</strong><small>Experimental and OFF by default.</small></span></label>
           <label class="toggle"><input name="analysis.lens_verification" type="checkbox"><span><strong>Lens/FOV verification</strong><small>Inspect fisheye circle, optical center, crop, and likely FOV family.</small></span></label>
-          <label class="toggle"><input name="analysis.lens_fov_auto_apply" type="checkbox"><span><strong>Auto-apply generic FOV</strong><small>Experimental; known filename/manual lens data still wins.</small></span></label>
         </div>
       </section>
 
       <section class="settings-section">
-        <div class="settings-section-title"><span>08</span><div><h3>Audio & autofocus</h3><p>Normalize quiet/loud sources through the HSP Audio keyframe, diagnose lip-sync and drift, and derive conservative autofocus bounds from measured stereo depth.</p></div></div>
+        <div class="settings-section-title"><span>08</span><div><h3>Audio & autofocus</h3><p>Measure loudness, lip-sync/drift evidence, and conservative autofocus bounds from stereo depth. Native timing/autofocus output is controlled separately in HSP policy.</p></div></div>
         <div class="settings-grid cols-3">
           <label class="field"><span>Target audio mean</span><input name="analysis.target_audio_mean_db" type="number" min="-32" max="-10" step="0.5"><small>dB; measured from representative windows.</small></label>
           <label class="field"><span>Maximum audio gain</span><input name="analysis.max_audio_gain" type="number" min="1" max="3" step="0.05"></label>
           <label class="toggle"><input name="analysis.audio_correction" type="checkbox"><span><strong>Audio analysis</strong><small>Measure representative loudness and timing evidence.</small></span></label>
           <label class="toggle"><input name="analysis.loudness_normalization" type="checkbox"><span><strong>Native volume normalization</strong><small>Apply a bounded HSP volume multiplier; source audio remains untouched.</small></span></label>
           <label class="toggle"><input name="analysis.audio_sync_analysis" type="checkbox"><span><strong>A/V sync analysis</strong><small>Correlate face/mouth motion with audio energy where evidence exists.</small></span></label>
-          <label class="toggle"><input name="analysis.audio_sync_auto_apply" type="checkbox"><span><strong>Auto-apply audio timing</strong><small>Experimental and OFF by default until sign/range behavior is calibrated across more native exports.</small></span></label>
           <label class="toggle"><input name="analysis.autofocus_tuning" type="checkbox"><span><strong>Autofocus depth recommendation</strong><small>Use stereo disparity to recommend a tighter, more stable focus range.</small></span></label>
-          <label class="toggle"><input name="analysis.autofocus_auto_apply" type="checkbox"><span><strong>Auto-apply autofocus range</strong><small>Opt-in; HereSphere’s own autofocus remains the primary system.</small></span></label>
         </div>
       </section>
 
@@ -453,6 +452,22 @@
             <label class="toggle span-2"><input name="hsp.auto_scene_keyframes" type="checkbox"><span><strong>Sparse scene keyframes</strong><small>Allow sustained scene-by-scene Image grades. When OFF, one whole-video grade is serialized.</small></span></label>
           </div>
         </div>
+        <div class="auto-hsp-policy-card native-hsp-policy-card">
+          <div class="auto-hsp-policy-heading"><div><strong>Native calibration output controls</strong><small>Stereo disparity and safe encoded-border crop preserve the v0.13.0 defaults and remain confidence-gated ON. Every newly exposed calibration stays OFF until you opt in. Explicit per-video layout overrides remain authoritative.</small></div><span class="calibration-badge">2 DEFAULT ON</span></div>
+          <div class="auto-hsp-policy-grid">
+            <label class="toggle"><input name="hsp.auto_stereo_disparity" type="checkbox"><span><strong>Stereo disparity</strong><small>Apply stable vertical-disparity correction through the native Alignment keyframe after the alignment confidence gate (0.72 by default). Horizontal disparity remains untouched depth.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_stereo_roll" type="checkbox"><span><strong>Stereo roll</strong><small>Apply a small persistent relative eye rotation when confidence is high.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_eye_scale_shear" type="checkbox"><span><strong>Eye scale / shear</strong><small>Apply measured per-eye scale and shear through native Stitch vectors.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_stitch_vectors" type="checkbox"><span><strong>Stitch vectors</strong><small>Apply bounded Shift/Scale/Shear/Flare/Slant suggestions from stable stereo geometry.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_crop" type="checkbox"><span><strong>Native border crop</strong><small>Apply safe persistent-border Zoom/Pan on supported projections after the crop confidence gate (0.82 by default).</small></span></label>
+            <label class="toggle"><input name="hsp.auto_horizon" type="checkbox"><span><strong>Horizon leveling</strong><small>Apply a small confidence-gated camera-roll correction through Orientation.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_orientation_180" type="checkbox"><span><strong>180° orientation correction</strong><small>Apply a strongly supported upside-down correction. Artistic shots can fool this evidence, so it stays OFF by default.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_eye_swap" type="checkbox"><span><strong>Eye swap</strong><small>Apply a strongly supported eye-order correction only when filename metadata is not authoritative.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_lens_fov" type="checkbox"><span><strong>Generic lens/FOV suggestion</strong><small>Apply a coarse visually measured FOV family only when filename/manual lens information does not already win.</small></span></label>
+            <label class="toggle"><input name="hsp.auto_autofocus" type="checkbox"><span><strong>Autofocus range</strong><small>Apply the measured native autofocus range recommendation.</small></span></label>
+            <label class="toggle span-2"><input name="hsp.auto_audio_sync" type="checkbox"><span><strong>Audio timing / drift</strong><small>Apply confidence-gated A/V offset and drift evidence through native Audio/Sync keyframes.</small></span></label>
+          </div>
+        </div>
       </section>
 
       <section class="settings-section" id="settingsRuntime">
@@ -480,6 +495,6 @@
   </dialog>
 
   <div class="toast-stack" id="toasts" aria-live="polite"></div>
-  <script src="/static/app.js?v=0.13.0" defer></script>
+  <script src="/static/app.js?v=0.13.1" defer></script>
 </body>
 </html>

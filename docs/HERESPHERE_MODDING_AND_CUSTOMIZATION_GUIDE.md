@@ -1,5 +1,7 @@
 # HereSphere Modding & Customization Guide
 
+HereTune project: [https://github.com/DaveTheAve/HereTune](https://github.com/DaveTheAve/HereTune)
+
 > **Unofficial community reference**  
 > **Focus:** HereSphere customization/modification outside the Web API  
 > **Last updated:** 2026-08-16  

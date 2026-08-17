@@ -23,7 +23,7 @@ def test_release_copy_and_selected_app_surfaces():
     js = (root / "heretune/static/app.js").read_text(encoding="utf-8")
     css = (root / "heretune/static/styles.css").read_text(encoding="utf-8")
     player = (root / "heretune/static/player.js").read_text(encoding="utf-8")
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     assert "Adaptive HSP Calibration" in html
     assert "YOUR HERE" in html and "SPHERE" in html and "COMPANION" in html
     assert "Intelligent correction." in html and "Original media." in html

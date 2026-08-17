@@ -142,40 +142,28 @@ class AnalysisCfg:
     vr_verification: bool = True
     vr_verification_frames: int = 6
     orientation_verification: bool = True
-    # Orientation is reported automatically, but the 180-degree correction is
-    # opt-in because face detection alone should not overrule artistic footage.
-    orientation_auto_apply: bool = False
-    # Eye order is measurable only indirectly from binocular disparity and can
-    # be intentionally unusual. Report suspicions by default; opt in to automatic
-    # swapping only after reviewing the detector on the local library.
-    eye_swap_auto_apply: bool = False
+    # Orientation and eye-order evidence are measured here. Whether those
+    # suggestions are serialized into Auto HSPs is controlled separately by
+    # the HSP output-policy switches below.
     stereo_alignment: bool = True
-    stereo_alignment_auto_apply: bool = True
     stereo_alignment_min_confidence: float = 0.72
     stereo_alignment_max_degrees: float = 0.75
     stereo_roll_correction: bool = True
-    stereo_roll_auto_apply: bool = False
     stereo_scale_correction: bool = True
-    stereo_scale_auto_apply: bool = False
     stitch_correction: bool = True
-    stitch_auto_apply: bool = False
     max_stitch_shift: float = 0.025
     max_stitch_scale_delta: float = 0.030
 
-    auto_crop: bool = True
     auto_crop_min_confidence: float = 0.82
     auto_crop_max_zoom: float = 1.32
     horizon_leveling: bool = True
-    horizon_auto_apply: bool = False
     horizon_min_confidence: float = 0.78
     horizon_max_degrees: float = 3.0
 
     autofocus_tuning: bool = True
-    autofocus_auto_apply: bool = False
     lens_verification: bool = True
     # Pixel boundaries can verify centering/crop and suggest a FOV family, but
     # they cannot identify an unknown proprietary lens with certainty.
-    lens_fov_auto_apply: bool = False
     lens_fov_min_confidence: float = 0.80
 
     # HSP Audio and Sync keyframes.  Loudness normalization is bounded and may
@@ -185,7 +173,6 @@ class AnalysisCfg:
     audio_correction: bool = True
     loudness_normalization: bool = True
     audio_sync_analysis: bool = True
-    audio_sync_auto_apply: bool = False
     target_audio_mean_db: float = -20.0
     max_audio_gain: float = 1.35
     min_rgb_gain: float = 0.80
@@ -229,6 +216,23 @@ class HspCfg:
     auto_midtones: bool = True
     auto_highlights: bool = True
     auto_scene_keyframes: bool = True
+
+    # Native VR calibration output policy. Verification/evidence is still
+    # measured when the corresponding Analysis switch is enabled. Preserve the
+    # public v0.13.0 confidence-gated defaults for vertical stereo alignment and
+    # safe encoded-border crop; newly exposed geometry/player controls remain
+    # opt-in. Explicit per-video layout overrides remain authoritative.
+    auto_stereo_disparity: bool = True
+    auto_stereo_roll: bool = False
+    auto_eye_scale_shear: bool = False
+    auto_stitch_vectors: bool = False
+    auto_crop: bool = True
+    auto_horizon: bool = False
+    auto_orientation_180: bool = False
+    auto_eye_swap: bool = False
+    auto_lens_fov: bool = False
+    auto_autofocus: bool = False
+    auto_audio_sync: bool = False
 
     # Optional HereTune-managed sidecar export. This writes <video-stem>.hsp
     # atomically beside the source, but never overwrites an unknown/user-owned
@@ -587,15 +591,11 @@ _EDITABLE_FIELDS: dict[str, set[str]] = {
         "scene_probe_width", "scene_boundary_refine_seconds", "scene_probe_persistence",
         "scene_full_samples_per_segment", "scene_probe_max_samples",
         "ffmpeg_sample_timeout_seconds", "ffmpeg_aux_timeout_seconds", "ffprobe_timeout_seconds",
-        "vr_verification", "vr_verification_frames", "orientation_verification", "orientation_auto_apply", "eye_swap_auto_apply",
-        "stereo_alignment", "stereo_alignment_auto_apply", "stereo_alignment_min_confidence", "stereo_alignment_max_degrees",
-        "stereo_roll_correction", "stereo_roll_auto_apply", "stereo_scale_correction", "stereo_scale_auto_apply",
-        "stitch_correction", "stitch_auto_apply", "max_stitch_shift", "max_stitch_scale_delta",
-        "auto_crop", "auto_crop_min_confidence", "auto_crop_max_zoom", "horizon_leveling", "horizon_auto_apply",
-        "horizon_min_confidence", "horizon_max_degrees", "autofocus_tuning", "autofocus_auto_apply",
-        "lens_verification", "lens_fov_auto_apply", "lens_fov_min_confidence",
-        "audio_correction", "loudness_normalization", "audio_sync_analysis", "audio_sync_auto_apply",
-        "target_audio_mean_db", "max_audio_gain",
+        "vr_verification", "vr_verification_frames", "orientation_verification", "stereo_alignment", "stereo_alignment_min_confidence", "stereo_alignment_max_degrees",
+        "stereo_roll_correction", "stereo_scale_correction",
+        "stitch_correction", "max_stitch_shift", "max_stitch_scale_delta",
+        "auto_crop_min_confidence", "auto_crop_max_zoom", "horizon_leveling", "horizon_min_confidence", "horizon_max_degrees", "autofocus_tuning", "lens_verification", "lens_fov_min_confidence",
+        "audio_correction", "loudness_normalization", "audio_sync_analysis", "target_audio_mean_db", "max_audio_gain",
         "min_rgb_gain", "max_rgb_gain",
     },
     "hsp": {
@@ -604,7 +604,11 @@ _EDITABLE_FIELDS: dict[str, set[str]] = {
         "auto_rgb_gain", "auto_global_offset", "auto_rgb_offset", "auto_global_gamma", "auto_rgb_gamma",
         "auto_global_contrast", "auto_rgb_contrast", "auto_global_saturation",
         "auto_rgb_saturation", "auto_shadows", "auto_midtones", "auto_highlights",
-        "auto_scene_keyframes", "write_auto_sidecars",
+        "auto_scene_keyframes",
+        "auto_stereo_disparity", "auto_stereo_roll", "auto_eye_scale_shear",
+        "auto_stitch_vectors", "auto_crop", "auto_horizon", "auto_orientation_180",
+        "auto_eye_swap", "auto_lens_fov", "auto_autofocus", "auto_audio_sync",
+        "write_auto_sidecars",
     },
     "paths": {"data_dir", "ffmpeg", "ffprobe"},
 }

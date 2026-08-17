@@ -5,7 +5,7 @@ from heretune.analyzer import ANALYSIS_VERSION
 
 
 def test_half_star_ui_only():
-    assert __version__ == "0.13.0"
+    assert __version__ == "0.13.1"
     root = Path(__file__).resolve().parents[1]
     app = (root / "heretune/static/app.js").read_text(encoding="utf-8")
     css = (root / "heretune/static/styles.css").read_text(encoding="utf-8")
