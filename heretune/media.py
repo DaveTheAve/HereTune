@@ -421,6 +421,7 @@ def preview_frame(
     timestamp_seconds: float | None = None,
     card_width: int = 640,
     card_height: int = 360,
+    timeout_seconds: float = 20.0,
 ) -> np.ndarray:
     duration = float(metadata.get("duration") or 0.0)
     ratio = 0.35
@@ -441,6 +442,7 @@ def preview_frame(
         int(metadata.get("height") or 0),
         max_width=max(960, packed_width),
         timestamp_ratio=ratio,
+        timeout_seconds=timeout_seconds,
     )
     if variant == "source":
         selected = rgb
@@ -453,8 +455,8 @@ def preview_frame(
     return _fit_card(selected, width=int(card_width), height=int(card_height))
 
 
-def preview_jpeg(path: Path, ffmpeg: str, metadata: dict[str, object], variant: str = "final") -> bytes:
-    return _jpeg_bytes(preview_frame(path, ffmpeg, metadata, variant))
+def preview_jpeg(path: Path, ffmpeg: str, metadata: dict[str, object], variant: str = "final", timeout_seconds: float = 20.0) -> bytes:
+    return _jpeg_bytes(preview_frame(path, ffmpeg, metadata, variant, timeout_seconds=timeout_seconds))
 
 
 def _scene_correction_at(
@@ -592,6 +594,7 @@ def before_after_jpeg(
     metadata: dict[str, object],
     correction: dict[str, object] | None,
     after: bool,
+    timeout_seconds: float = 20.0,
 ) -> bytes:
     duration = float(metadata.get("duration") or 0.0)
     timestamp = _comparison_preview_timestamp(correction, duration)
@@ -603,6 +606,7 @@ def before_after_jpeg(
         timestamp_seconds=timestamp,
         card_width=PREVIEW_CARD_WIDTH,
         card_height=PREVIEW_CARD_HEIGHT,
+        timeout_seconds=timeout_seconds,
     )
     if after and correction:
         frame = apply_correction_preview(frame, _scene_correction_at(correction, timestamp))
