@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+import types
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -8,7 +10,7 @@ from fastapi.testclient import TestClient
 from heretune.cli import _network_kind
 from heretune.config import Config, load_config, save_config_patch
 from heretune.media import _decode_output, thumbnail_filters
-from heretune.server import create_app
+from heretune.server import _preview_decoding, create_app
 
 
 def test_external_tool_output_never_uses_windows_charmap():
@@ -163,3 +165,25 @@ def test_clean_startup_banner_groups_networks(monkeypatch, capsys):
     assert "http://192.168.0.237:8777/heresphere" in output
     assert "Tailscale" in output
     assert "Uvicorn" not in output
+
+
+def test_work_loop_yields_only_while_preview_semaphore_is_held():
+    """Regression: the analysis work_loop must hold (yield) only while an
+    on-demand preview is actually decoding — i.e. only when
+    ``app.state.preview_semaphore`` is present AND locked. A build without the
+    semaphore (pre-preview-PR) or an unheld semaphore must NOT hold the queue,
+    so the fix stays a safe no-op on its own."""
+    state = types.SimpleNamespace()
+    # no semaphore at all -> no yield (keeps the work_loop a no-op without PR #7)
+    assert _preview_decoding(state) is False
+
+    async def drive():
+        sem = asyncio.Semaphore(1)
+        state.preview_semaphore = sem
+        assert _preview_decoding(state) is False  # present but free
+        await sem.acquire()                        # a preview is decoding
+        assert _preview_decoding(state) is True
+        sem.release()                              # preview finished
+        assert _preview_decoding(state) is False
+
+    asyncio.run(drive())
