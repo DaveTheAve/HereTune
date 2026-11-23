@@ -3120,13 +3120,14 @@ def analyze(
     sparse sequence of complete Image keyframes; it never performs continuous
     frame-by-frame automatic white balance.
 
-    HereTune deliberately does not auto-tune HDR or >8-bit sources until the
-    player-specific HDR transfer behavior has been calibrated.  Quietly treating
+    HereTune deliberately does not auto-tune true-HDR (PQ/HLG) sources until the
+    player-specific HDR transfer behavior has been calibrated.  SDR sources that
+    are merely >8-bit (e.g. 10-bit bt.709) are analyzed normally; quietly treating
     PQ/HLG as ordinary SDR would be a very confident way to make it worse.
     """
-    if bool(metadata.get("is_hdr")) or int(metadata.get("bit_depth") or 8) > 8:
+    if bool(metadata.get("is_hdr")):
         raise AnalysisError(
-            "HDR/>8-bit auto tuning is disabled until HereSphere HDR behavior is calibrated."
+            "HDR (PQ/HLG) auto tuning is disabled until HereSphere HDR behavior is calibrated."
         )
 
     info = MediaInfo(

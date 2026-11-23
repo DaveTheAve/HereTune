@@ -787,7 +787,7 @@ def process(db, cfg, row, progress=None, worker_plan_provider=None) -> None:
             )
             correction.analysis_seconds = max(0.0, time.monotonic() - analysis_started)
         except AnalysisError as exc:
-            if bool(metadata.get("is_hdr")) or int(metadata.get("bit_depth") or 8) > 8:
+            if bool(metadata.get("is_hdr")):
                 db.exec(
                     """UPDATE videos SET status='skipped', metadata_json=?, analysis_json=?,
                        thumb_path=?, last_analyzed=?, error=?, profile_mode='auto' WHERE id=?""",
