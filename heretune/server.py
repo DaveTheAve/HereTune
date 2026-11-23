@@ -2676,6 +2676,17 @@ def _heresphere_library_diagnostic(payload: dict[str, object], *, ready_only: bo
     )
 
 
+def _preview_decoding(app_state) -> bool:
+    """True while an on-demand preview (a Before/After frame, or a
+    rejected-sample tile) is decoding and holding ``app.state.preview_semaphore``.
+    The analysis work_loop yields in that window so the preview gets the machine
+    to itself; it resumes on the next poll tick once the semaphore is released.
+    Reads via ``getattr`` so the work_loop stays a no-op on builds without the
+    semaphore (keeps PR #8 independent of the preview PR)."""
+    semaphore = getattr(app_state, "preview_semaphore", None)
+    return semaphore is not None and semaphore.locked()
+
+
 def create_app(cfg) -> FastAPI:
     db = DB(cfg.db_path)
     library = Library(db, cfg)
@@ -2944,6 +2955,16 @@ def create_app(cfg) -> FastAPI:
                 if app.state.work_paused:
                     try:
                         await asyncio.wait_for(stop.wait(), timeout=0.5)
+                    except asyncio.TimeoutError:
+                        pass
+                    continue
+                # Yield to on-demand previews: while a Before/After frame or a
+                # rejected-sample tile is decoding (preview_semaphore held), hold
+                # the analysis queue so the preview gets the box to itself.
+                # Resumes within one poll tick once the preview finishes.
+                if _preview_decoding(app.state):
+                    try:
+                        await asyncio.wait_for(stop.wait(), timeout=0.25)
                     except asyncio.TimeoutError:
                         pass
                     continue
