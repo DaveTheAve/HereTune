@@ -35,9 +35,10 @@ def test_comparison_timestamp_falls_back_without_scenes():
 def test_sbs_comparison_preserves_full_eye_resolution(monkeypatch, tmp_path: Path):
     seen = {}
 
-    def fake_decode(path, ffmpeg, duration, source_width, source_height, max_width=640, timestamp_ratio=0.35):
+    def fake_decode(path, ffmpeg, duration, source_width, source_height, max_width=640, timestamp_ratio=0.35, timeout_seconds=20.0):
         seen["max_width"] = max_width
         seen["ratio"] = timestamp_ratio
+        seen["timeout"] = timeout_seconds
         # Return a packed SBS image at the requested width.
         h = max(2, max_width // 2)
         return np.zeros((h, max_width, 3), dtype=np.uint8)
@@ -55,6 +56,28 @@ def test_sbs_comparison_preserves_full_eye_resolution(monkeypatch, tmp_path: Pat
     assert seen["max_width"] == 1920
     assert seen["ratio"] == pytest.approx(0.4)
     assert result.shape == (540, 960, 3)
+
+
+def test_preview_threads_sample_timeout_to_decoder(monkeypatch, tmp_path: Path):
+    """Regression: the on-demand preview path must honour the configured sample
+    timeout rather than the 20s default baked into ``_decode_rgb_frame`` — heavy
+    8K AV1 seeks used to 500 with "FFmpeg preview seek timed out after 20s".
+    Verify the timeout is threaded through preview_frame, preview_jpeg and
+    before_after_jpeg down to the decoder."""
+    seen = {}
+
+    def fake_decode(path, ffmpeg, duration, source_width, source_height, max_width=640, timestamp_ratio=0.35, timeout_seconds=20.0):
+        seen["timeout"] = timeout_seconds
+        return np.zeros((max(2, max_width // 2), max_width, 3), dtype=np.uint8)
+
+    monkeypatch.setattr(media, "_decode_rgb_frame", fake_decode)
+    meta = {"duration": 100.0, "width": 3840, "height": 1920, "stereo": "sbs"}
+    media.preview_frame(tmp_path / "movie.mp4", "ffmpeg", meta, "final", card_width=960, card_height=540, timeout_seconds=40.0)
+    assert seen["timeout"] == 40.0
+    media.preview_jpeg(tmp_path / "movie.mp4", "ffmpeg", meta, "final", timeout_seconds=40.0)
+    assert seen["timeout"] == 40.0
+    media.before_after_jpeg(tmp_path / "movie.mp4", "ffmpeg", meta, None, True, timeout_seconds=40.0)
+    assert seen["timeout"] == 40.0
 
 
 def test_neutral_static_grade_is_effectively_identity():

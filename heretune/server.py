@@ -3064,6 +3064,11 @@ def create_app(cfg) -> FastAPI:
     app.state.worker_plan = {}
     app.state.live = live
     app.state.thumbnail_semaphore = asyncio.Semaphore(2)
+    # On-demand previews (Before/After frames + the rejected-sample gallery)
+    # each decode from the source video on open. Serializing them 1-by-1 stops
+    # the details pane from firing N+2 simultaneous 8K AV1 seeks that starve
+    # each other past the sample timeout. Bump to 2 if large galleries feel slow.
+    app.state.preview_semaphore = asyncio.Semaphore(1)
 
     @app.middleware("http")
     async def dashboard_security(request: Request, call_next):
@@ -3850,11 +3855,17 @@ def create_app(cfg) -> FastAPI:
         # Evidence imagery is decoded directly from the original source video
         # on demand. No analysis JPEGs are read or written.
         metadata = effective_metadata(video, video.get("metadata") or {})
+        # Honor the same sample timeout as the preview path (config
+        # ffmpeg_sample_timeout_seconds) and serialize with the shared preview
+        # semaphore so the rejected-sample gallery renders 1-by-1, not all at once.
+        sample_timeout = float(getattr(cfg.analysis, "ffmpeg_sample_timeout_seconds", 20.0))
         try:
-            frame = await _daemon_to_thread(
-                preview_frame, Path(str(video["path"])), cfg.paths.ffmpeg, metadata, "final",
-                timestamp_seconds=float(time_seconds), card_width=min(960, int(width)), card_height=540,
-            )
+            async with app.state.preview_semaphore:
+                frame = await _daemon_to_thread(
+                    preview_frame, Path(str(video["path"])), cfg.paths.ffmpeg, metadata, "final",
+                    timestamp_seconds=float(time_seconds), card_width=min(960, int(width)), card_height=540,
+                    timeout_seconds=sample_timeout,
+                )
             bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             ok, payload = cv2.imencode(".jpg", bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
             if not ok:
@@ -4720,15 +4731,24 @@ def create_app(cfg) -> FastAPI:
         if variant not in {"source", "left", "right", "final", "before", "after"}:
             raise HTTPException(404, "Unknown preview variant")
         metadata = thumbnail_browse_metadata(video, effective_metadata(video, video.get("metadata") or {}))
+        # Honor the same sample timeout the analysis uses (config.toml
+        # ffmpeg_sample_timeout_seconds) instead of the hardcoded 20s default —
+        # 8K AV1 preview seeks are heavy and were timing out at 20s on the box.
+        preview_timeout = float(getattr(cfg.analysis, "ffmpeg_sample_timeout_seconds", 20.0))
+        # Serialize on-demand previews (shared with the rejected-sample gallery)
+        # so the details pane doesn't fire N+2 simultaneous 8K AV1 seeks that
+        # starve each other past the sample timeout.
         try:
-            if variant in {"before", "after"}:
-                correction = _selected_hsp_preview_correction(video, cfg)
-                payload = await _daemon_to_thread(
-                    before_after_jpeg, Path(video["path"]), cfg.paths.ffmpeg, metadata,
-                    correction, variant == "after",
-                )
-            else:
-                payload = await _daemon_to_thread(preview_jpeg, Path(video["path"]), cfg.paths.ffmpeg, metadata, variant)
+            async with app.state.preview_semaphore:
+                if variant in {"before", "after"}:
+                    correction = _selected_hsp_preview_correction(video, cfg)
+                    payload = await _daemon_to_thread(
+                        before_after_jpeg, Path(video["path"]), cfg.paths.ffmpeg, metadata,
+                        correction, variant == "after",
+                        timeout_seconds=preview_timeout,
+                    )
+                else:
+                    payload = await _daemon_to_thread(preview_jpeg, Path(video["path"]), cfg.paths.ffmpeg, metadata, variant, timeout_seconds=preview_timeout)
         except Exception as exc:
             raise HTTPException(500, f"Preview generation failed: {exc}") from exc
         return Response(payload, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
