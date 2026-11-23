@@ -4,6 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 import heretune.analyzer as analyzer
 import heretune.worker as worker
@@ -205,3 +206,23 @@ def test_worker_prints_effective_sampling_plan(monkeypatch, tmp_path: Path, caps
     assert "9 full/segment" in combined
     assert "max grades 8" in combined
     assert "workers GPU 4/CPU 8" in combined
+
+
+def test_sdr_bit_depth_is_analyzed_not_skipped_as_hdr():
+    """Regression: the auto-tune skip gate keys on true-HDR (``is_hdr``), not on
+    bit depth. 10-bit SDR (yuv420p10le / bt709) is the bulk of the library and
+    must be analyzed, not skipped as if it were HDR. A true-HDR source is still
+    skipped. We probe the gate in isolation: metadata with no duration reaches the
+    "Video duration is missing" check only if the HDR gate let it through."""
+    # true HDR (PQ/HLG) -> skipped by the gate
+    with pytest.raises(analyzer.AnalysisError) as hdr:
+        analyzer.analyze(Path("hdr.mp4"), {"is_hdr": True, "bit_depth": 8}, "ffmpeg", None)
+    assert "HDR" in str(hdr.value)
+    # 10-bit SDR -> passes the gate (reaches the duration check, a different error)
+    with pytest.raises(analyzer.AnalysisError) as sdr10:
+        analyzer.analyze(Path("sdr10.mp4"), {"is_hdr": False, "bit_depth": 10}, "ffmpeg", None)
+    assert "duration" in str(sdr10.value).lower()
+    # 8-bit SDR -> also analyzed
+    with pytest.raises(analyzer.AnalysisError) as sdr8:
+        analyzer.analyze(Path("sdr8.mp4"), {"is_hdr": False, "bit_depth": 8}, "ffmpeg", None)
+    assert "duration" in str(sdr8.value).lower()
